@@ -15,7 +15,6 @@
 #include <type_traits>
 #include <vector>
 
-// #define DEBUG_OFFSETS 1
 
 class ZoneStreamFillReadAccessor
 {
@@ -236,12 +235,23 @@ public:
         return static_cast<T*>(ConvertOffsetToAliasLookup(static_cast<const void*>(offset)));
     }
 
-#ifdef DEBUG_OFFSETS
-    virtual void DebugOffsets(size_t assetIndex) const = 0;
-#endif
+    /**
+     * \brief Logs how much of each block the traversal actually consumed against the size the zone
+     * \return True when every file backed block ended exactly on its allocated size.
+     */
+    virtual bool ReportBlockUsage() const = 0;
 
+    /**
+     * \brief Creates a stream that resolves serialized zone pointers into block memory.
+     * \param pointerBitCount Width of a serialized pointer, in bits.
+     * \param blockBitCount Number of bits the block index occupies.
+     * \param offsetBitCount Number of bits the offset occupies, which is also the position the block
+     *                       index starts at. This is not always pointerBitCount - blockBitCount:
+     *                       IW4MS encodes a 4-bit block index at bit 28 of a 64-bit pointer.
+     */
     static std::unique_ptr<ZoneInputStream> Create(unsigned pointerBitCount,
                                                    unsigned blockBitCount,
+                                                   unsigned offsetBitCount,
                                                    std::vector<XBlock*>& blocks,
                                                    block_t insertBlock,
                                                    ILoadingStream& stream,

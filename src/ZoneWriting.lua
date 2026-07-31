@@ -40,6 +40,11 @@ function ZoneWriting:project()
 			path.join(folder, "ZoneWriting/**.cpp"),
 			ZoneCode:allWriteFiles()
 		}
+
+		-- IW4MS serializes 64 bit pointers, so its generated code is x64 only. See ZoneCode.Assets64.
+		filter "platforms:x64"
+			files { ZoneCode:allWriteFiles64() }
+		filter {}
 		
         vpaths {
 			["*"] = {

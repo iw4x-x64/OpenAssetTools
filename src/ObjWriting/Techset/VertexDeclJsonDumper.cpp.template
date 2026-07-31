@@ -1,0 +1,74 @@
+#options GAME (IW4, IW4MS)
+
+#filename "Game/" + GAME + "/Techset/VertexDeclJsonDumper" + GAME + ".cpp"
+
+#set WRITER_HEADER "\"VertexDeclJsonDumper" + GAME + ".h\""
+#set CLASS_NAME "VertexDeclJsonDumper" + GAME
+#set GAME_LOWER_NAME "\"iw4\""
+
+// This file was templated.
+// See VertexDeclJsonDumper.cpp.template.
+// Do not modify, changes will be lost.
+
+#include WRITER_HEADER
+
+#include "Dumping/AssetDumpingContext.h"
+
+#include <iomanip>
+#include <nlohmann/json.hpp>
+
+using namespace nlohmann;
+using namespace GAME;
+
+namespace
+{
+    class Dumper
+    {
+    public:
+        explicit Dumper(std::ostream& stream)
+            : m_stream(stream)
+        {
+        }
+
+        void Dump(const MaterialVertexDeclaration& decl) const
+        {
+            json jRoot;
+
+            jRoot["_type"] = "vertexdecl";
+            jRoot["_version"] = 1;
+            jRoot["_game"] = GAME_LOWER_NAME;
+
+            jRoot["hasOptionalSource"] = decl.hasOptionalSource;
+
+            auto jStreams = json::array();
+            const auto streamCount = std::min(static_cast<unsigned>(decl.streamCount), ROUTING_COUNT);
+            for (auto i = 0u; i < streamCount; i++)
+            {
+                jStreams.emplace_back(json{
+                    {"source", decl.routing.data[i].source},
+                    {"dest",     decl.routing.data[i].dest  },
+                });
+            }
+            jRoot["streams"] = std::move(jStreams);
+
+            m_stream << std::setw(4) << jRoot << "\n";
+        }
+
+    private:
+        static constexpr auto ROUTING_COUNT = 13u;
+
+        std::ostream& m_stream;
+    };
+} // namespace
+
+namespace techset
+{
+    void CLASS_NAME::DumpAsset(AssetDumpingContext& context, const XAssetInfo<AssetVertexDecl::Type>& asset)
+    {
+        const auto assetFile = context.OpenAssetFile(std::format("vertexdecl/{}.json", asset.m_name));
+        if (!assetFile)
+            return;
+
+        Dumper(*assetFile).Dump(*asset.Asset());
+    }
+} // namespace techset

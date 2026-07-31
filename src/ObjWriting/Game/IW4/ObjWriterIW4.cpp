@@ -1,14 +1,23 @@
 #include "ObjWriterIW4.h"
 
+#include "Game/IW4/FX/EfxDumperIW4.h"
+#include "Game/IW4/FX/ImpactFxJsonDumperIW4.h"
 #include "Game/IW4/Font/FontDumperIW4.h"
 #include "Game/IW4/Image/ImageDumperIW4.h"
 #include "Game/IW4/Maps/MapEntsDumperIW4.h"
 #include "Game/IW4/Material/MaterialJsonDumperIW4.h"
+#include "Game/IW4/Sound/SndAliasListCsvDumperIW4.h"
 #include "Game/IW4/Techset/PixelShaderDumperIW4.h"
 #include "Game/IW4/Techset/TechsetDumperIW4.h"
+#include "Game/IW4/Techset/VertexDeclJsonDumperIW4.h"
 #include "Game/IW4/Techset/VertexShaderDumperIW4.h"
 #include "Game/IW4/Tracer/TracerDumperIW4.h"
 #include "Game/IW4/Vehicle/VehicleDumperIW4.h"
+#include "Game/IW4/World/ClipMapJsonDumperIW4.h"
+#include "Game/IW4/World/ComWorldJsonDumperIW4.h"
+#include "Game/IW4/World/FxWorldJsonDumperIW4.h"
+#include "Game/IW4/World/GameWorldJsonDumperIW4.h"
+#include "Game/IW4/World/GfxWorldJsonDumperIW4.h"
 #include "Game/IW4/XAnim/XAnimDumperIW4.h"
 #include "Game/IW4/XModel/XModelDumperIW4.h"
 #include "Leaderboard/LeaderboardJsonDumperIW4.h"
@@ -32,6 +41,16 @@ using namespace IW4;
 void ObjWriter::RegisterAssetDumpers(AssetDumpingContext& context)
 {
     RegisterAssetDumper(std::make_unique<phys_preset::InfoStringDumperIW4>());
+    RegisterAssetDumper(std::make_unique<fx::EfxDumperIW4>());
+    RegisterAssetDumper(std::make_unique<fx::ImpactFxJsonDumperIW4>());
+    RegisterAssetDumper(std::make_unique<techset::VertexDeclJsonDumperIW4>());
+    RegisterAssetDumper(std::make_unique<world::ComWorldJsonDumperIW4>());
+    RegisterAssetDumper(std::make_unique<world::FxWorldJsonDumperIW4>());
+    RegisterAssetDumper(std::make_unique<world::GameWorldSpJsonDumperIW4>());
+    RegisterAssetDumper(std::make_unique<world::GameWorldMpJsonDumperIW4>());
+    RegisterAssetDumper(std::make_unique<world::ClipMapSpJsonDumperIW4>());
+    RegisterAssetDumper(std::make_unique<world::ClipMapMpJsonDumperIW4>());
+    RegisterAssetDumper(std::make_unique<world::GfxWorldJsonDumperIW4>());
     RegisterAssetDumper(std::make_unique<phys_collmap::DumperIW4>());
     RegisterAssetDumper(std::make_unique<xanim::DumperIW4>());
     RegisterAssetDumper(std::make_unique<xmodel::DumperIW4>());
@@ -50,6 +69,7 @@ void ObjWriter::RegisterAssetDumpers(AssetDumpingContext& context)
         ));
     RegisterAssetDumper(std::make_unique<image::DumperIW4>());
     // REGISTER_DUMPER(AssetDumpersnd_alias_list_t)
+    RegisterAssetDumper(std::make_unique<sound::CsvDumperIW4>());
     RegisterAssetDumper(std::make_unique<sound_curve::DumperIW4>());
     RegisterAssetDumper(std::make_unique<sound::LoadedSoundDumperIW4>());
     // REGISTER_DUMPER(AssetDumperClipMap)

@@ -2,6 +2,7 @@
 
 #include "IW3/CommonAssetIW3.h"
 #include "IW4/CommonAssetIW4.h"
+#include "IW4MS/CommonAssetIW4MS.h"
 #include "IW5/CommonAssetIW5.h"
 #include "T4/CommonAssetT4.h"
 #include "T5/CommonAssetT5.h"
@@ -14,6 +15,7 @@ ICommonAssetTypeMapper* ICommonAssetTypeMapper::GetCommonAssetMapperByGame(GameI
     static ICommonAssetTypeMapper* assetTypeMappers[]{
         new IW3::CommonAssetTypeMapper(),
         new IW4::CommonAssetTypeMapper(),
+        new IW4MS::CommonAssetTypeMapper(),
         new IW5::CommonAssetTypeMapper(),
         new T4::CommonAssetTypeMapper(),
         new T5::CommonAssetTypeMapper(),

@@ -1,0 +1,91 @@
+#options GAME (IW4, IW4MS)
+
+#filename "Game/" + GAME + "/World/ComWorldJsonDumper" + GAME + ".cpp"
+
+#set WRITER_HEADER "\"ComWorldJsonDumper" + GAME + ".h\""
+#set CLASS_NAME "ComWorldJsonDumper" + GAME
+#set GAME_LOWER_NAME "\"iw4\""
+
+// This file was templated.
+// See ComWorldJsonDumper.cpp.template.
+// Do not modify, changes will be lost.
+
+#include WRITER_HEADER
+
+#include "Dumping/AssetDumpingContext.h"
+#include "World/WorldJsonCommon.h"
+
+#include <iomanip>
+#include <nlohmann/json.hpp>
+
+using namespace nlohmann;
+using namespace GAME;
+
+namespace
+{
+    class Dumper
+    {
+    public:
+        explicit Dumper(std::ostream& stream)
+            : m_stream(stream)
+        {
+        }
+
+        void Dump(const ComWorld& comWorld) const
+        {
+            json jRoot;
+
+            jRoot["_type"] = "comworld";
+            jRoot["_version"] = 1;
+            jRoot["_game"] = GAME_LOWER_NAME;
+
+            jRoot["isInUse"] = comWorld.isInUse;
+
+            auto jLights = json::array();
+            for (auto i = 0u; i < comWorld.primaryLightCount; i++)
+                jLights.emplace_back(CreateLight(comWorld.primaryLights[i]));
+            jRoot["primaryLights"] = std::move(jLights);
+
+            m_stream << std::setw(4) << jRoot << "\n";
+        }
+
+    private:
+        [[nodiscard]] static json CreateLight(const ComPrimaryLight& light)
+        {
+            json jLight{
+                {"type",               static_cast<int>(light.type)           },
+                {"canUseShadowMap",    light.canUseShadowMap != 0             },
+                {"exponent",           static_cast<int>(light.exponent)       },
+                {"color",              world::Vec3(light.color)               },
+                {"dir",                world::Vec3(light.dir)                 },
+                {"origin",             world::Vec3(light.origin)              },
+                {"radius",             light.radius                           },
+                {"cosHalfFovOuter",    light.cosHalfFovOuter                  },
+                {"cosHalfFovInner",    light.cosHalfFovInner                  },
+                {"cosHalfFovExpanded", light.cosHalfFovExpanded               },
+                {"rotationLimit",      light.rotationLimit                    },
+                {"translationLimit",   light.translationLimit                 },
+                {"defName",            dumping::ReferencedAssetName(light.defName)},
+            };
+
+            if (light.unused)
+                jLight["unused"] = static_cast<int>(light.unused);
+
+            return jLight;
+        }
+
+        std::ostream& m_stream;
+    };
+} // namespace
+
+namespace world
+{
+    void CLASS_NAME::DumpAsset(AssetDumpingContext& context, const XAssetInfo<AssetComWorld::Type>& asset)
+    {
+        const auto assetFile = context.OpenAssetFile(std::format("comworld/{}.json", asset.m_name));
+        if (!assetFile)
+            return;
+
+        Dumper(*assetFile).Dump(*asset.Asset());
+    }
+} // namespace world

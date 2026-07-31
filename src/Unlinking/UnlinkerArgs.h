@@ -4,6 +4,7 @@
 #include "Zone/Zone.h"
 
 #include <cstdint>
+#include <optional>
 #include <regex>
 #include <set>
 #include <string>
@@ -57,6 +58,15 @@ public:
 
     bool m_skip_obj;
     bool m_use_gdt;
+
+    /** When set, zones are loaded as this game instead of detecting it from the fastfile header. */
+    std::optional<GameId> m_forced_game;
+
+    /** When set, the zone is written back out as this game rather than having its assets dumped. */
+    std::optional<GameId> m_convert_to_game;
+
+    /** When set, every zone stream operation is recorded to this file. */
+    std::optional<std::string> m_stream_trace_file;
 
     UnlinkerArgs();
     bool ParseArgs(int argc, const char** argv, bool& shouldContinue);

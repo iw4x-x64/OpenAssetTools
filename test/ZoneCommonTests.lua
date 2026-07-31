@@ -36,6 +36,18 @@ function ZoneCommonTests:project()
 			path.join(folder, "ZoneCommonTests/**.cpp"),
 			ZoneCode:allTestFiles()
 		}
+
+		-- IW4MS serializes 64 bit pointers, so its generated code is x64 only. See ZoneCode.Assets64.
+		filter "platforms:x64"
+			files { ZoneCode:allTestFiles64() }
+		filter {}
+
+		-- The hand written IW4MS tests assert the sizes DB_GetXAssetTypeSize reports for the retail
+		-- x64 build, so they only mean anything where a pointer is 8 bytes. On x86 they would fail
+		-- for a reason that says nothing about the code.
+		filter "platforms:x86"
+			removefiles { path.join(folder, "ZoneCommonTests/Game/IW4MS/**") }
+		filter {}
 		
         vpaths {
 			["*"] = {

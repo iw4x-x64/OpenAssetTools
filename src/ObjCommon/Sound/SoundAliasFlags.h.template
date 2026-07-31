@@ -1,0 +1,64 @@
+#options GAME (IW4, IW4MS)
+
+#filename "Game/" + GAME + "/Sound/SoundAliasFlags" + GAME + ".h"
+
+// This file was templated.
+// See SoundAliasFlags.h.template.
+// Do not modify, changes will be lost.
+
+#pragma once
+
+#include <cstdint>
+#include <string>
+
+namespace GAME
+{
+    namespace snd_alias_flags
+    {
+        inline constexpr uint32_t MASTER_SLAVE          = 1u << 2u;
+        inline constexpr uint32_t LOOPING               = 1u << 0u;
+        inline constexpr uint32_t REVERB_FULL_DRY_LEVEL = 1u << 3u;
+        inline constexpr uint32_t REVERB_NO_WET_LEVEL   = 1u << 4u;
+        inline constexpr unsigned CHANNEL_SHIFT         = 9u;
+        inline constexpr uint32_t CHANNEL_MASK          = 0x3Fu;
+
+        [[nodiscard]] inline unsigned Channel(const int flags)
+        {
+            return (static_cast<uint32_t>(flags) >> CHANNEL_SHIFT) & CHANNEL_MASK;
+        }
+
+        [[nodiscard]] inline bool IsLooping(const int flags)
+        {
+            return (static_cast<uint32_t>(flags) & LOOPING) != 0u;
+        }
+
+        [[nodiscard]] inline bool IsMaster(const int flags)
+        {
+            return (static_cast<uint32_t>(flags) & MASTER_SLAVE) != 0u;
+        }
+
+        [[nodiscard]] inline std::string Reverb(const int flags)
+        {
+            const auto f = static_cast<uint32_t>(flags);
+            std::string result;
+
+            if ((f & REVERB_NO_WET_LEVEL) != 0u)
+                result = "nowetlevel";
+
+            if ((f & REVERB_FULL_DRY_LEVEL) != 0u)
+            {
+                if (!result.empty())
+                    result += ' ';
+                result += "fulldrylevel";
+            }
+
+            return result;
+        }
+
+        inline constexpr uint32_t UNRECOVERED_MASK = ~(LOOPING
+                                                   | MASTER_SLAVE
+                                                   | REVERB_FULL_DRY_LEVEL
+                                                   | REVERB_NO_WET_LEVEL
+                                                   | (CHANNEL_MASK << CHANNEL_SHIFT));
+    } // namespace snd_alias_flags
+} // namespace GAME

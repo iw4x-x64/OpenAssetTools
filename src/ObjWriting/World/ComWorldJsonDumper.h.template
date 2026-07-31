@@ -1,0 +1,24 @@
+#options GAME (IW4, IW4MS)
+
+#filename "Game/" + GAME + "/World/ComWorldJsonDumper" + GAME + ".h"
+
+#set GAME_HEADER "\"Game/" + GAME + "/" + GAME + ".h\""
+#set CLASS_NAME "ComWorldJsonDumper" + GAME
+
+// This file was templated.
+// See ComWorldJsonDumper.h.template.
+// Do not modify, changes will be lost.
+
+#pragma once
+
+#include "Dumping/AbstractAssetDumper.h"
+#include GAME_HEADER
+
+namespace world
+{
+    class CLASS_NAME final : public AbstractAssetDumper<GAME::AssetComWorld>
+    {
+    protected:
+        void DumpAsset(AssetDumpingContext& context, const XAssetInfo<GAME::AssetComWorld::Type>& asset) override;
+    };
+} // namespace world

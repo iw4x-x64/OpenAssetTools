@@ -1,0 +1,31 @@
+#options GAME (IW4, IW4MS)
+
+#filename "Game/" + GAME + "/World/GameWorldJsonDumper" + GAME + ".h"
+
+#set GAME_HEADER "\"Game/" + GAME + "/" + GAME + ".h\""
+#set SP_CLASS_NAME "GameWorldSpJsonDumper" + GAME
+#set MP_CLASS_NAME "GameWorldMpJsonDumper" + GAME
+
+// This file was templated.
+// See GameWorldJsonDumper.h.template.
+// Do not modify, changes will be lost.
+
+#pragma once
+
+#include "Dumping/AbstractAssetDumper.h"
+#include GAME_HEADER
+
+namespace world
+{
+    class SP_CLASS_NAME final : public AbstractAssetDumper<GAME::AssetGameWorldSp>
+    {
+    protected:
+        void DumpAsset(AssetDumpingContext& context, const XAssetInfo<GAME::AssetGameWorldSp::Type>& asset) override;
+    };
+
+    class MP_CLASS_NAME final : public AbstractAssetDumper<GAME::AssetGameWorldMp>
+    {
+    protected:
+        void DumpAsset(AssetDumpingContext& context, const XAssetInfo<GAME::AssetGameWorldMp::Type>& asset) override;
+    };
+} // namespace world

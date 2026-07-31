@@ -1,4 +1,4 @@
-#options GAME (IW3, IW4, IW5, T4, T5, T6)
+#options GAME (IW3, IW4, IW4MS, IW5, T4, T5, T6)
 
 #filename "Game/" + GAME + "/Material/JsonMaterialLoader" + GAME + ".cpp"
 
@@ -7,6 +7,12 @@
 #define HAS_WATER
 #define GAME_LOWER "iw3"
 #elif GAME == "IW4"
+#define FEATURE_IW4
+#define HAS_WATER
+#define GAME_LOWER "iw4"
+#elif GAME == "IW4MS"
+// IW4MS shares the IW4 content model, so it takes the same branches as IW4.
+#define FEATURE_IW4MS
 #define FEATURE_IW4
 #define HAS_WATER
 #define GAME_LOWER "iw4"
@@ -80,7 +86,7 @@ namespace
                     con::error("Tried to load material \"{}\" but did not find expected type material of version 1", material.info.name);
                     return false;
                 }
-            
+
 #ifndef FEATURE_T6 // T6 did not have this check in version 1, so to stay backwards compatible, let it stay that way
                 std::string game;
                 jRoot.at("_game").get_to(game);
@@ -147,6 +153,30 @@ namespace
             water.codeConstant[2] = jWater.codeConstant[2];
             water.codeConstant[3] = jWater.codeConstant[3];
 
+#ifdef FEATURE_IW4MS
+            // This build splits H0 into two planar float arrays, so the two halves
+            // are read back separately. The dumper writes them as h0 and h0Part1
+            // for the same reason.
+            const auto expectedH0PartSize = water.M * water.N * sizeof(float);
+            if (expectedH0PartSize > 0)
+            {
+                water.H0Part0 = m_memory.Alloc<float>(water.M * water.N);
+                const auto part0Size = base64::DecodeBase64(jWater.h0.data(), jWater.h0.size(), water.H0Part0, expectedH0PartSize);
+                if (part0Size != expectedH0PartSize)
+                {
+                    PrintError(material, std::format("Water h0 size {} does not match expected {}", part0Size, expectedH0PartSize));
+                    return false;
+                }
+
+                water.H0Part1 = m_memory.Alloc<float>(water.M * water.N);
+                const auto part1Size = base64::DecodeBase64(jWater.h0Part1.data(), jWater.h0Part1.size(), water.H0Part1, expectedH0PartSize);
+                if (part1Size != expectedH0PartSize)
+                {
+                    PrintError(material, std::format("Water h0Part1 size {} does not match expected {}", part1Size, expectedH0PartSize));
+                    return false;
+                }
+            }
+#else
             const auto expectedH0Size = water.M * water.N * sizeof(complex_s);
             if (expectedH0Size > 0)
             {
@@ -158,6 +188,7 @@ namespace
                     return false;
                 }
             }
+#endif
 
             const auto expectedWTermSize = water.M * water.N * sizeof(float);
             if (expectedWTermSize > 0)

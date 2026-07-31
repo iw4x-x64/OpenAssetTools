@@ -16,6 +16,8 @@ public:
 
     [[nodiscard]] unsigned GetSize() const;
     [[nodiscard]] unsigned GetAlignment() const;
+    /** \see DataDefinition::GetAllocAlignment */
+    [[nodiscard]] unsigned GetAllocAlignment() const;
     [[nodiscard]] bool GetForceAlignment() const;
 
     std::vector<std::unique_ptr<DeclarationModifier>> m_declaration_modifiers;
@@ -29,4 +31,6 @@ public:
     unsigned m_flags;
     unsigned m_size;
     unsigned m_alignment;
+    /** Zero means allocations use m_alignment. */
+    unsigned m_alloc_alignment;
 };

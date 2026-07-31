@@ -2,6 +2,7 @@
 
 #include "Game/IW3/ZoneWriterFactoryIW3.h"
 #include "Game/IW4/ZoneWriterFactoryIW4.h"
+#include "Game/IW4MS/ZoneWriterFactoryIW4MS.h"
 #include "Game/IW5/ZoneWriterFactoryIW5.h"
 #include "Game/T4/ZoneWriterFactoryT4.h"
 #include "Game/T5/ZoneWriterFactoryT5.h"
@@ -14,6 +15,7 @@ const IZoneWriterFactory* IZoneWriterFactory::GetZoneWriterFactoryForGame(GameId
     static const IZoneWriterFactory* zoneCreators[]{
         new IW3::ZoneWriterFactory(),
         new IW4::ZoneWriterFactory(),
+        new IW4MS::ZoneWriterFactory(),
         new IW5::ZoneWriterFactory(),
         new T4::ZoneWriterFactory(),
         new T5::ZoneWriterFactory(),

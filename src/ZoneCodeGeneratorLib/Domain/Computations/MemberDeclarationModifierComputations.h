@@ -29,6 +29,7 @@ public:
     [[nodiscard]] const IEvaluation* GetDynamicArraySizeEvaluation() const;
     [[nodiscard]] bool HasPointerModifier() const;
     [[nodiscard]] unsigned GetAlignment() const;
+    [[nodiscard]] unsigned GetAllocAlignment() const;
 
 private:
     DeclarationModifierComputations(const MemberInformation* member, std::vector<int> modifierIndices);

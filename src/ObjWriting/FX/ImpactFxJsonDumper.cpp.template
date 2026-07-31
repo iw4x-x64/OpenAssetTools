@@ -1,0 +1,138 @@
+#options GAME (IW4, IW4MS)
+
+#filename "Game/" + GAME + "/FX/ImpactFxJsonDumper" + GAME + ".cpp"
+
+#set WRITER_HEADER "\"ImpactFxJsonDumper" + GAME + ".h\""
+#set CONSTANTS_HEADER "\"Game/" + GAME + "/MaterialConstants" + GAME + ".h\""
+#set CLASS_NAME "ImpactFxJsonDumper" + GAME
+#set GAME_LOWER_NAME "\"iw4\""
+
+// This file was templated.
+// See ImpactFxJsonDumper.cpp.template.
+// Do not modify, changes will be lost.
+
+#include WRITER_HEADER
+
+#include CONSTANTS_HEADER
+#include "Dumping/AssetDumpingContext.h"
+#include "Dumping/ReferencedAssetName.h"
+
+#include <iomanip>
+#include <nlohmann/json.hpp>
+#include <string_view>
+
+using namespace nlohmann;
+using namespace GAME;
+
+namespace
+{
+    constexpr std::string_view DEFAULT_ASSET_NAME = "default";
+
+    [[nodiscard]] std::string ImpactTypeKey(const unsigned index)
+    {
+        switch (index)
+        {
+        case IMPACT_TYPE_NONE:
+            return "none";
+        case IMPACT_TYPE_BULLET_SMALL:
+            return "bullet_small";
+        case IMPACT_TYPE_BULLET_LARGE:
+            return "bullet_large";
+        case IMPACT_TYPE_BULLET_AP:
+            return "bullet_ap";
+        case IMPACT_TYPE_BULLET_EXPLODE:
+            return "bullet_explode";
+        case IMPACT_TYPE_SHOTGUN:
+            return "shotgun";
+        case IMPACT_TYPE_SHOTGUN_EXPLODE:
+            return "shotgun_explode";
+        case IMPACT_TYPE_GRENADE_BOUNCE:
+            return "grenade_bounce";
+        case IMPACT_TYPE_GRENADE_EXPLODE:
+            return "grenade_explode";
+        case IMPACT_TYPE_ROCKET_EXPLODE:
+            return "rocket_explode";
+        case IMPACT_TYPE_PROJECTILE_DUD:
+            return "projectile_dud";
+        default:
+            return std::format("unnamed_{}", index);
+        }
+    }
+
+    class Dumper
+    {
+    public:
+        explicit Dumper(std::ostream& stream)
+            : m_stream(stream)
+        {
+        }
+
+        void Dump(const FxImpactTable& impactTable) const
+        {
+            json jRoot;
+
+            jRoot["_type"] = "impactfx";
+            jRoot["_version"] = 1;
+            jRoot["_game"] = GAME_LOWER_NAME;
+
+            auto jTable = json::object();
+            for (auto i = 0u; i < TABLE_ENTRY_COUNT; i++)
+                jTable[ImpactTypeKey(i)] = CreateEntry(impactTable.table[i]);
+            jRoot["table"] = std::move(jTable);
+
+            m_stream << std::setw(4) << jRoot << "\n";
+        }
+
+    private:
+        static constexpr auto TABLE_ENTRY_COUNT = 15u;
+
+        [[nodiscard]] static json CreateEntry(const FxImpactEntry& entry)
+        {
+            json jEntry;
+
+            auto jNonflesh = json::object();
+            for (auto i = 0u; i < SURF_TYPE_NUM; i++)
+            {
+                if (entry.nonflesh[i] && entry.nonflesh[i]->name)
+                    jNonflesh[surfaceTypeNames[i]] = dumping::ReferencedAssetName(entry.nonflesh[i]->name);
+            }
+            if (!jNonflesh.empty())
+                jEntry["nonflesh"] = std::move(jNonflesh);
+
+            auto jFlesh = json::array();
+            auto anyFlesh = false;
+            for (const auto* effect : entry.flesh)
+            {
+                if (effect && effect->name)
+                {
+                    jFlesh.emplace_back(dumping::ReferencedAssetName(effect->name));
+                    anyFlesh = true;
+                }
+                else
+                {
+                    jFlesh.emplace_back(nullptr);
+                }
+            }
+            if (anyFlesh)
+                jEntry["flesh"] = std::move(jFlesh);
+
+            return jEntry;
+        }
+
+        std::ostream& m_stream;
+    };
+} // namespace
+
+namespace fx
+{
+    void CLASS_NAME::DumpAsset(AssetDumpingContext& context, const XAssetInfo<AssetImpactFx::Type>& asset)
+    {
+        const auto name = asset.m_name.empty() ? DEFAULT_ASSET_NAME : std::string_view(asset.m_name);
+
+        const auto assetFile = context.OpenAssetFile(std::format("impactfx/{}.json", name));
+        if (!assetFile)
+            return;
+
+        Dumper(*assetFile).Dump(*asset.Asset());
+    }
+} // namespace fx

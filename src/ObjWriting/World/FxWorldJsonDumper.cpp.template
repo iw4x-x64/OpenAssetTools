@@ -1,0 +1,136 @@
+#options GAME (IW4, IW4MS)
+
+#filename "Game/" + GAME + "/World/FxWorldJsonDumper" + GAME + ".cpp"
+
+#set WRITER_HEADER "\"FxWorldJsonDumper" + GAME + ".h\""
+#set CLASS_NAME "FxWorldJsonDumper" + GAME
+#set GAME_LOWER_NAME "\"iw4\""
+
+// This file was templated.
+// See FxWorldJsonDumper.cpp.template.
+// Do not modify, changes will be lost.
+
+#include WRITER_HEADER
+
+#include "Dumping/AssetDumpingContext.h"
+#include "World/WorldJsonCommon.h"
+
+#include <iomanip>
+#include <nlohmann/json.hpp>
+
+using namespace nlohmann;
+using namespace GAME;
+
+namespace
+{
+    class Dumper
+    {
+    public:
+        explicit Dumper(std::ostream& stream)
+            : m_stream(stream)
+        {
+        }
+
+        void Dump(const FxWorld& fxWorld) const
+        {
+            const auto& glass = fxWorld.glassSys;
+
+            json jRoot;
+
+            jRoot["_type"] = "fxworld";
+            jRoot["_version"] = 1;
+            jRoot["_game"] = GAME_LOWER_NAME;
+
+            jRoot["glassSys"] = {
+                {"time",                  glass.time                 },
+                {"prevTime",              glass.prevTime             },
+                {"pieceLimit",            glass.pieceLimit           },
+                {"pieceWordCount",        glass.pieceWordCount       },
+                {"cellCount",             glass.cellCount            },
+                {"activePieceCount",      glass.activePieceCount     },
+                {"firstFreePiece",        glass.firstFreePiece       },
+                {"geoDataLimit",          glass.geoDataLimit         },
+                {"geoDataCount",          glass.geoDataCount         },
+                {"needToCompactData",     glass.needToCompactData    },
+                {"initCount",             static_cast<int>(glass.initCount)},
+                {"effectChanceAccum",     glass.effectChanceAccum    },
+                {"lastPieceDeletionTime", glass.lastPieceDeletionTime},
+            };
+
+            auto jDefs = json::array();
+            for (auto i = 0u; i < glass.defCount; i++)
+                jDefs.emplace_back(CreateDef(glass.defs[i]));
+            jRoot["defs"] = std::move(jDefs);
+
+            auto jInitPieces = json::array();
+            for (auto i = 0u; i < glass.initPieceCount; i++)
+                jInitPieces.emplace_back(CreateInitPiece(glass.initPieceStates[i]));
+            jRoot["initPieceStates"] = std::move(jInitPieces);
+
+            auto jLightingHandles = json::array();
+            for (auto i = 0u; i < glass.initPieceCount; i++)
+                jLightingHandles.emplace_back(glass.lightingHandles[i]);
+            jRoot["lightingHandles"] = std::move(jLightingHandles);
+
+            auto jInitGeoData = json::array();
+            for (auto i = 0u; i < glass.initGeoDataCount; i++)
+                jInitGeoData.emplace_back(json::array({glass.initGeoData[i].anonymous[0], glass.initGeoData[i].anonymous[1]}));
+            jRoot["initGeoData"] = std::move(jInitGeoData);
+
+            m_stream << std::setw(4) << jRoot << "\n";
+        }
+
+    private:
+        [[nodiscard]] static json CreateDef(const FxGlassDef& def)
+        {
+            return json{
+                {"halfThickness",     def.halfThickness                                                     },
+                {"texVecs",           json::array({world::Vec2(def.texVecs[0]), world::Vec2(def.texVecs[1])})},
+                {"color",             json::array({static_cast<unsigned char>(def.color.array[0]),
+                                             static_cast<unsigned char>(def.color.array[1]),
+                                             static_cast<unsigned char>(def.color.array[2]),
+                                             static_cast<unsigned char>(def.color.array[3])})},
+                {"material",          dumping::ReferencedAssetName(def.material ? def.material->info.name : nullptr)},
+                {"materialShattered", dumping::ReferencedAssetName(def.materialShattered ? def.materialShattered->info.name : nullptr)},
+                {"physPreset",        dumping::ReferencedAssetName(def.physPreset ? def.physPreset->name : nullptr)},
+            };
+        }
+
+        [[nodiscard]] static json CreateInitPiece(const FxGlassInitPieceState& piece)
+        {
+            json jPiece{
+                {"frame",
+                 json{
+                     {"quat", world::Vec4(piece.frame.quat)},
+                     {"origin", world::Vec3(piece.frame.origin)},
+                 }                                                },
+                {"radius",         piece.radius                   },
+                {"texCoordOrigin", world::Vec2(piece.texCoordOrigin)},
+                {"supportMask",    piece.supportMask              },
+                {"areaX2",         piece.areaX2                   },
+                {"defIndex",       static_cast<int>(piece.defIndex)},
+                {"vertCount",      static_cast<int>(piece.vertCount)},
+                {"fanDataCount",   static_cast<int>(piece.fanDataCount)},
+            };
+
+            if (piece.pad[0])
+                jPiece["pad"] = static_cast<int>(piece.pad[0]);
+
+            return jPiece;
+        }
+
+        std::ostream& m_stream;
+    };
+} // namespace
+
+namespace world
+{
+    void CLASS_NAME::DumpAsset(AssetDumpingContext& context, const XAssetInfo<AssetFxWorld::Type>& asset)
+    {
+        const auto assetFile = context.OpenAssetFile(std::format("fxworld/{}.json", asset.m_name));
+        if (!assetFile)
+            return;
+
+        Dumper(*assetFile).Dump(*asset.Asset());
+    }
+} // namespace world

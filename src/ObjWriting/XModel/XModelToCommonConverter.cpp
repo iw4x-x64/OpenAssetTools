@@ -2,6 +2,7 @@
 
 #include "Game/IW3/XModel/XModelToCommonConverterIW3.h"
 #include "Game/IW4/XModel/XModelToCommonConverterIW4.h"
+#include "Game/IW4MS/XModel/XModelToCommonConverterIW4MS.h"
 #include "Game/IW5/XModel/XModelToCommonConverterIW5.h"
 #include "Game/T4/XModel/XModelToCommonConverterT4.h"
 #include "Game/T5/XModel/XModelToCommonConverterT5.h"
@@ -16,6 +17,7 @@ namespace xmodel
         static ToCommonConverter* toCommonConverters[]{
             new ToCommonConverterIW3(),
             new ToCommonConverterIW4(),
+            new ToCommonConverterIW4MS(),
             new ToCommonConverterIW5(),
             new ToCommonConverterT4(),
             new ToCommonConverterT5(),

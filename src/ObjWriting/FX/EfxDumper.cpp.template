@@ -1,0 +1,500 @@
+#options GAME (IW4, IW4MS)
+
+#filename "Game/" + GAME + "/FX/EfxDumper" + GAME + ".cpp"
+
+#set WRITER_HEADER "\"EfxDumper" + GAME + ".h\""
+#set FLAGS_HEADER "\"Game/" + GAME + "/FX/FxElemFlags" + GAME + ".h\""
+
+// This file was templated.
+// See EfxDumper.cpp.template.
+// Do not modify, changes will be lost.
+
+#include WRITER_HEADER
+
+#include FLAGS_HEADER
+#include "Dumping/ReferencedAssetName.h"
+
+#include <algorithm>
+#include <cmath>
+#include <format>
+#include <ostream>
+#include <string>
+#include <vector>
+
+using namespace GAME;
+
+namespace
+{
+    constexpr auto FORMAT_VERSION = 2;
+
+    [[nodiscard]] const char* ElemTypeKey(const unsigned char elemType)
+    {
+        switch (elemType)
+        {
+        case FX_ELEM_TYPE_SPRITE_BILLBOARD:
+            return "billboardSprite";
+        case FX_ELEM_TYPE_SPRITE_ORIENTED:
+            return "orientedSprite";
+        case FX_ELEM_TYPE_TAIL:
+            return "tail";
+        case FX_ELEM_TYPE_TRAIL:
+            return "trail";
+        case FX_ELEM_TYPE_CLOUD:
+            return "cloud";
+        case FX_ELEM_TYPE_SPARK_CLOUD:
+            return "sparkCloud"; // derived from the enum, no reference file uses it
+        case FX_ELEM_TYPE_SPARK_FOUNTAIN:
+            return "sparkFountain"; // derived from the enum, no reference file uses it
+        case FX_ELEM_TYPE_MODEL:
+            return "model";
+        case FX_ELEM_TYPE_OMNI_LIGHT:
+            return "light"; // derived from the enum, no reference file uses it
+        case FX_ELEM_TYPE_SPOT_LIGHT:
+            return "spotLight"; // derived from the enum, no reference file uses it
+        case FX_ELEM_TYPE_SOUND:
+            return "sound";
+        case FX_ELEM_TYPE_DECAL:
+            return "decal";
+        case FX_ELEM_TYPE_RUNNER:
+            return "runner";
+        default:
+            return "unknown";
+        }
+    }
+
+    class Writer
+    {
+    public:
+        explicit Writer(std::ostream& stream)
+            : m_stream(stream)
+        {
+        }
+
+        void Write(const FxEffectDef& fx)
+        {
+            m_stream << "iwfx " << FORMAT_VERSION << "\n";
+
+            const auto elemCount = fx.elemDefCountLooping + fx.elemDefCountOneShot + fx.elemDefCountEmission;
+            for (auto i = 0; i < elemCount; i++)
+            {
+                m_stream << "\n{\n";
+                WriteElem(fx, fx.elemDefs[i], i);
+                m_stream << "}\n";
+            }
+        }
+
+    private:
+        [[nodiscard]] static bool IsLooping(const FxEffectDef& fx, const int index)
+        {
+            return index < fx.elemDefCountLooping;
+        }
+
+        void WriteElem(const FxEffectDef& fx, const FxElemDef& elem, const int index)
+        {
+            Key("name");
+            m_stream << "\"\";\n";
+
+            WriteFlags(elem);
+
+            Range("spawnRange", elem.spawnRange);
+            Range("fadeInRange", elem.fadeInRange);
+            Range("fadeOutRange", elem.fadeOutRange);
+            Scalar("spawnFrustumCullRadius", elem.spawnFrustumCullRadius);
+
+            if (IsLooping(fx, index))
+            {
+                Key("spawnLooping");
+                m_stream << elem.spawn.looping.intervalMsec << ' ' << elem.spawn.looping.count << ";\n";
+                Key("spawnOneShot");
+                m_stream << "1 0;\n";
+            }
+            else
+            {
+                Key("spawnLooping");
+                m_stream << "0 0;\n";
+                Key("spawnOneShot");
+                m_stream << elem.spawn.oneShot.count.base << ' ' << elem.spawn.oneShot.count.amplitude << ";\n";
+            }
+
+            IntRange("spawnDelayMsec", elem.spawnDelayMsec);
+            IntRange("lifeSpanMsec", elem.lifeSpanMsec);
+            Range("spawnOrgX", elem.spawnOrigin[0]);
+            Range("spawnOrgY", elem.spawnOrigin[1]);
+            Range("spawnOrgZ", elem.spawnOrigin[2]);
+            Range("spawnOffsetRadius", elem.spawnOffsetRadius);
+            Range("spawnOffsetHeight", elem.spawnOffsetHeight);
+            Range("spawnAnglePitch", elem.spawnAngles[0]);
+            Range("spawnAngleYaw", elem.spawnAngles[1]);
+            Range("spawnAngleRoll", elem.spawnAngles[2]);
+            Range("angleVelPitch", elem.angularVelocity[0]);
+            Range("angleVelYaw", elem.angularVelocity[1]);
+            Range("angleVelRoll", elem.angularVelocity[2]);
+            Range("initialRot", elem.initialRotation);
+            Range("gravity", elem.gravity);
+            Range("elasticity", elem.reflectionFactor);
+
+            WriteAtlas(elem.atlas);
+            WriteVelGraphs(elem);
+            WriteVisGraphs(elem);
+
+            Scalar("lightingFrac", static_cast<float>(static_cast<unsigned char>(elem.lightingFrac)) / 255.0f);
+
+            Key("collOffset");
+            const auto& mins = elem.collBounds.midPoint;
+            m_stream << mins.x << ' ' << mins.y << ' ' << mins.z << ";\n";
+            Scalar("collRadius", std::max({elem.collBounds.halfSize.x, elem.collBounds.halfSize.y, elem.collBounds.halfSize.z}));
+
+            EffectRef("fxOnImpact", elem.effectOnImpact);
+            EffectRef("fxOnDeath", elem.effectOnDeath);
+            Key("sortOrder");
+            m_stream << static_cast<int>(elem.sortOrder) << ";\n";
+            EffectRef("emission", elem.effectEmitted);
+            Range("emitDist", elem.emitDist);
+            Range("emitDistVariance", elem.emitDistVariance);
+
+            WriteTrail(elem);
+            WriteVisuals(elem);
+        }
+
+        void WriteFlags(const FxElemDef& elem)
+        {
+            using namespace fx_elem_flags;
+
+            std::vector<const char*> tokens;
+
+            if (HasFlag(elem.flags, SPAWN_RELATIVE))
+                tokens.emplace_back("spawnRelative");
+            if (HasFlag(elem.flags, SPAWN_FRUSTUM_CULL))
+                tokens.emplace_back("spawnFrustumCull");
+            if (HasFlag(elem.flags, RUNNER_USES_RAND_ROT))
+                tokens.emplace_back("runnerUsesRandRot");
+
+            switch (GetSpawnOffset(elem.flags))
+            {
+            case SpawnOffset::NONE:
+                tokens.emplace_back("spawnOffsetNone");
+                break;
+            case SpawnOffset::SPHERE:
+                tokens.emplace_back("spawnOffsetSphere");
+                break;
+            case SpawnOffset::CYLINDER:
+                tokens.emplace_back("spawnOffsetCylinder");
+                break;
+            default:
+                break;
+            }
+
+            switch (GetRunRelTo(elem.flags))
+            {
+            case RunRelTo::WORLD:
+                tokens.emplace_back("runRelToWorld");
+                break;
+            case RunRelTo::SPAWN:
+                tokens.emplace_back("runRelToSpawn");
+                break;
+            case RunRelTo::EFFECT:
+                tokens.emplace_back("runRelToEffect");
+                break;
+            case RunRelTo::OFFSET:
+                tokens.emplace_back("runRelToOffset");
+                break;
+            }
+
+            if (HasFlag(elem.flags, USE_COLLISION))
+                tokens.emplace_back("useCollision");
+            if (HasFlag(elem.flags, DIE_ON_TOUCH))
+                tokens.emplace_back("dieOnTouch");
+            if (HasFlag(elem.flags, DRAW_PAST_FOG))
+                tokens.emplace_back("drawPastFog");
+            if (HasFlag(elem.flags, DRAW_WITH_VIEW_MODEL))
+                tokens.emplace_back("drawWithViewModel");
+            if (HasFlag(elem.flags, BLOCKS_SIGHT))
+                tokens.emplace_back("blocksSight");
+            if (HasFlag(elem.flags, MODEL_USES_PHYSICS))
+                tokens.emplace_back("modelUsesPhysics");
+            if (HasFlag(elem.flags, NON_UNIFORM_SCALE))
+                tokens.emplace_back("nonUniformScale");
+
+            Key("flags");
+            for (auto i = 0u; i < tokens.size(); i++)
+                m_stream << (i ? " " : "") << tokens[i];
+            m_stream << ";\n";
+        }
+
+        void WriteAtlas(const FxElemAtlas& atlas)
+        {
+            using namespace fx_atlas_behavior;
+
+            Key("atlasBehavior");
+            switch (GetStart(atlas.behavior))
+            {
+            case Start::FIXED:
+                m_stream << "startFixed";
+                break;
+            case Start::RANDOM:
+                m_stream << "startRandom";
+                break;
+            case Start::INDEXED:
+                m_stream << "startIndexed";
+                break;
+            default:
+                m_stream << "startFixed";
+                break;
+            }
+            if (HasFlag(atlas.behavior, PLAY_OVER_LIFE))
+                m_stream << " playOverLife";
+            if (HasFlag(atlas.behavior, LOOP_ONLY_N_TIMES))
+                m_stream << " loopOnlyNTimes";
+            m_stream << ";\n";
+
+            Key("atlasIndex");
+            m_stream << static_cast<int>(atlas.index) << ";\n";
+            Key("atlasFps");
+            m_stream << static_cast<int>(atlas.fps) << ";\n";
+            Key("atlasLoopCount");
+            m_stream << static_cast<int>(atlas.loopCount) << ";\n";
+            Key("atlasColIndexBits");
+            m_stream << static_cast<int>(atlas.colIndexBits) << ";\n";
+            Key("atlasRowIndexBits");
+            m_stream << static_cast<int>(atlas.rowIndexBits) << ";\n";
+            Key("atlasEntryCount");
+            m_stream << atlas.entryCount << ";\n";
+        }
+
+        void Graph(const char* key, const std::vector<std::vector<float>>& base, const std::vector<std::vector<float>>& amplitude)
+        {
+            auto scale = 0.0f;
+            for (const auto* curve : {&base, &amplitude})
+                for (const auto& frame : *curve)
+                    for (const auto component : frame)
+                        scale = std::max(scale, std::fabs(component));
+
+            Key(key);
+            m_stream << scale << "\n\t{\n";
+            WriteCurve(base, scale);
+            WriteCurve(amplitude, scale);
+            m_stream << "\t};\n";
+        }
+
+        void WriteCurve(const std::vector<std::vector<float>>& curve, const float scale)
+        {
+            m_stream << "\t\t{\n";
+            const auto intervals = curve.empty() ? 0u : static_cast<unsigned>(curve.size()) - 1u;
+            for (auto i = 0u; i < curve.size(); i++)
+            {
+                const auto time = intervals ? static_cast<float>(i) / static_cast<float>(intervals) : 0.0f;
+                m_stream << "\t\t\t" << time;
+                for (const auto component : curve[i])
+                    m_stream << ' ' << (scale != 0.0f ? component / scale : 0.0f);
+                m_stream << '\n';
+            }
+            m_stream << "\t\t}\n";
+        }
+
+        void EmptyGraph(const char* key, const unsigned components)
+        {
+            const std::vector<std::vector<float>> curve(2, std::vector<float>(components, 0.0f));
+            Graph(key, curve, curve);
+        }
+
+        void WriteVelGraphs(const FxElemDef& elem)
+        {
+            const auto frames = static_cast<unsigned char>(elem.velIntervalCount) + 1u;
+
+            static constexpr const char* KEYS[2][3]{
+                {"velGraph0X", "velGraph0Y", "velGraph0Z"},
+                {"velGraph1X", "velGraph1Y", "velGraph1Z"},
+            };
+
+            for (auto frame = 0u; frame < 2u; frame++)
+            {
+                for (auto axis = 0u; axis < 3u; axis++)
+                {
+                    if (!elem.velSamples)
+                    {
+                        EmptyGraph(KEYS[frame][axis], 1u);
+                        continue;
+                    }
+
+                    std::vector<std::vector<float>> base;
+                    std::vector<std::vector<float>> amplitude;
+
+                    for (auto i = 0u; i < frames; i++)
+                    {
+                        const auto& sample = elem.velSamples[i];
+                        const auto& state = frame == 0u ? sample.local : sample.world;
+                        base.push_back({state.velocity.base[axis]});
+                        amplitude.push_back({state.velocity.amplitude[axis]});
+                    }
+
+                    Graph(KEYS[frame][axis], base, amplitude);
+                }
+            }
+        }
+
+        void WriteVisGraphs(const FxElemDef& elem)
+        {
+            const auto frames = static_cast<unsigned char>(elem.visStateIntervalCount) + 1u;
+
+            if (!elem.visSamples)
+            {
+                for (const auto* key : {"rotGraph", "sizeGraph0", "sizeGraph1", "scaleGraph"})
+                    EmptyGraph(key, 1u);
+                EmptyGraph("colorGraph", 3u);
+                EmptyGraph("alphaGraph", 1u);
+                return;
+            }
+
+            const auto collect = [&](auto&& pick)
+            {
+                std::vector<std::vector<float>> base;
+                std::vector<std::vector<float>> amplitude;
+                for (auto i = 0u; i < frames; i++)
+                {
+                    base.push_back(pick(elem.visSamples[i].base));
+                    amplitude.push_back(pick(elem.visSamples[i].amplitude));
+                }
+                return std::pair{base, amplitude};
+            };
+
+            {
+                const auto [b, a] = collect([](const FxElemVisualState& s) { return std::vector{s.rotationDelta}; });
+                Graph("rotGraph", b, a);
+            }
+            {
+                const auto [b, a] = collect([](const FxElemVisualState& s) { return std::vector{s.size[0]}; });
+                Graph("sizeGraph0", b, a);
+            }
+            {
+                const auto [b, a] = collect([](const FxElemVisualState& s) { return std::vector{s.size[1]}; });
+                Graph("sizeGraph1", b, a);
+            }
+            {
+                const auto [b, a] = collect([](const FxElemVisualState& s) { return std::vector{s.scale}; });
+                Graph("scaleGraph", b, a);
+            }
+            {
+                const auto [b, a] = collect(
+                    [](const FxElemVisualState& s)
+                    {
+                        return std::vector{static_cast<float>(static_cast<unsigned char>(s.color[0])) / 255.0f,
+                                           static_cast<float>(static_cast<unsigned char>(s.color[1])) / 255.0f,
+                                           static_cast<float>(static_cast<unsigned char>(s.color[2])) / 255.0f};
+                    });
+                Graph("colorGraph", b, a);
+            }
+            {
+                const auto [b, a] = collect(
+                    [](const FxElemVisualState& s)
+                    { return std::vector{static_cast<float>(static_cast<unsigned char>(s.color[3])) / 255.0f}; });
+                Graph("alphaGraph", b, a);
+            }
+        }
+
+        void WriteTrail(const FxElemDef& elem)
+        {
+            const auto* trail = static_cast<unsigned char>(elem.elemType) == FX_ELEM_TYPE_TRAIL ? elem.extended.trailDef : nullptr;
+
+            Scalar("trailSplitDist", trail && trail->invSplitDist != 0.0f ? 1.0f / trail->invSplitDist : 0.0f);
+            Key("trailScrollTime");
+            m_stream << (trail ? static_cast<float>(trail->scrollTimeMsec) / 1000.0f : 0.0f) << ";\n";
+            Key("trailRepeatDist");
+            m_stream << (trail ? trail->repeatDist : 0) << ";\n";
+        }
+
+        void WriteVisuals(const FxElemDef& elem)
+        {
+            const auto elemType = static_cast<unsigned char>(elem.elemType);
+            const auto count = static_cast<unsigned char>(elem.visualCount);
+
+            m_stream << '\t' << ElemTypeKey(elemType) << "\n\t{\n";
+
+            for (auto i = 0u; i < count; i++)
+            {
+                if (elemType == FX_ELEM_TYPE_DECAL)
+                {
+                    const auto& mark = elem.visuals.markArray[i];
+                    for (const auto* material : mark.materials)
+                        m_stream << "\t\t\"" << dumping::ReferencedAssetName(material ? material->info.name : nullptr) << "\"\n";
+                }
+                else
+                {
+                    const auto& visual = count == 1u ? elem.visuals.instance : elem.visuals.array[i];
+                    m_stream << "\t\t\"" << VisualName(elemType, visual) << "\"\n";
+                }
+            }
+
+            m_stream << "\t};\n";
+        }
+
+        [[nodiscard]] static const char* VisualName(const unsigned char elemType, const FxElemVisuals& visual)
+        {
+            switch (elemType)
+            {
+            case FX_ELEM_TYPE_MODEL:
+                return dumping::ReferencedAssetName(visual.model ? visual.model->name : nullptr);
+            case FX_ELEM_TYPE_SOUND:
+                return dumping::ReferencedAssetName(visual.soundName);
+            case FX_ELEM_TYPE_RUNNER:
+                return dumping::ReferencedAssetName(visual.effectDef.name);
+            case FX_ELEM_TYPE_SPRITE_BILLBOARD:
+            case FX_ELEM_TYPE_SPRITE_ORIENTED:
+            case FX_ELEM_TYPE_TAIL:
+            case FX_ELEM_TYPE_TRAIL:
+            case FX_ELEM_TYPE_CLOUD:
+            case FX_ELEM_TYPE_SPARK_CLOUD:
+            case FX_ELEM_TYPE_SPARK_FOUNTAIN:
+                return dumping::ReferencedAssetName(visual.material ? visual.material->info.name : nullptr);
+            default:
+                // The light types, and anything unrecognised. No arm is populated.
+                return "";
+            }
+        }
+
+        void Key(const char* key)
+        {
+            m_stream << '\t' << key << ' ';
+        }
+
+        void Scalar(const char* key, const float value)
+        {
+            Key(key);
+            m_stream << value << ";\n";
+        }
+
+        void Range(const char* key, const FxFloatRange& range)
+        {
+            Key(key);
+            m_stream << range.base << ' ' << range.amplitude << ";\n";
+        }
+
+        void IntRange(const char* key, const FxIntRange& range)
+        {
+            Key(key);
+            m_stream << range.base << ' ' << range.amplitude << ";\n";
+        }
+
+        void EffectRef(const char* key, const FxEffectDefRef& ref)
+        {
+            Key(key);
+            m_stream << '"' << dumping::ReferencedAssetName(ref.name) << "\";\n";
+        }
+
+        std::ostream& m_stream;
+    };
+} // namespace
+
+#set CLASS_NAME "EfxDumper" + GAME
+
+namespace fx
+{
+    void CLASS_NAME::DumpAsset(AssetDumpingContext& context, const XAssetInfo<AssetFx::Type>& asset)
+    {
+        const auto* fx = asset.Asset();
+        const auto assetFile = context.OpenAssetFile(std::format("fx/{}.efx", fx->name));
+        if (!assetFile)
+            return;
+
+        Writer(*assetFile).Write(*fx);
+    }
+} // namespace fx

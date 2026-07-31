@@ -1,7 +1,17 @@
-#include "MenuConverterIW4.h"
+#options GAME (IW4, IW4MS)
+
+#filename "Game/" + GAME + "/Menu/MenuConverter" + GAME + ".cpp"
+
+// This file was templated.
+// See MenuConverter.cpp.template.
+// Do not modify, changes will be lost.
+
+#set CONVERTER_HEADER "\"MenuConverter" + GAME + ".h\""
+#include CONVERTER_HEADER
 
 #include "Menu/AbstractMenuConverter.h"
-#include "MenuConversionZoneStateIW4.h"
+#set ZONE_STATE_HEADER "\"Game/" + GAME + "/Menu/MenuConversionZoneState" + GAME + ".h\""
+#include ZONE_STATE_HEADER
 #include "Parsing/Menu/Domain/EventHandler/CommonEventHandlerCondition.h"
 #include "Parsing/Menu/Domain/EventHandler/CommonEventHandlerScript.h"
 #include "Parsing/Menu/Domain/EventHandler/CommonEventHandlerSetLocalVar.h"
@@ -18,7 +28,7 @@
 #include <format>
 #include <sstream>
 
-using namespace IW4;
+using namespace GAME;
 using namespace menu;
 
 namespace

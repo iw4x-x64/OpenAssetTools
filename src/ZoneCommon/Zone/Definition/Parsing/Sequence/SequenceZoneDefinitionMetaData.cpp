@@ -18,20 +18,6 @@ namespace
     constexpr auto METADATA_IPAK = "ipak";
     constexpr auto METADATA_IWD = "iwd";
 
-    std::optional<GameId> GetGameByName(const std::string& gameName)
-    {
-        auto upperGameName = gameName;
-        utils::MakeStringUpperCase(upperGameName);
-
-        for (auto i = 0u; i < static_cast<unsigned>(GameId::COUNT); i++)
-        {
-            if (upperGameName == GameId_Names[i])
-                return static_cast<GameId>(i);
-        }
-
-        return std::nullopt;
-    }
-
     enum class ProjectType : std::uint8_t
     {
         NONE,
@@ -78,7 +64,7 @@ namespace
 {
     void ProcessMetaDataGame(ZoneDefinitionParserState* state, const ZoneDefinitionParserValue& valueToken, const std::string& value)
     {
-        const auto game = GetGameByName(value);
+        const auto game = IGame::FindGameIdByName(value);
         if (!game)
             throw ParsingException(valueToken.GetPos(), "Unknown game name");
 

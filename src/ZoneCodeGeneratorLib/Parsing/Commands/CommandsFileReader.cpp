@@ -6,6 +6,7 @@
 #include "Parsing/Impl/DefinesStreamProxy.h"
 #include "Parsing/Impl/IncludingStreamProxy.h"
 #include "Parsing/Impl/ParserFilesystemStream.h"
+#include "Parsing/PostProcessing/CalculateAllocAlignmentPostProcessor.h"
 #include "Parsing/PostProcessing/CalculateSizeAndAlignPostProcessor.h"
 #include "Parsing/PostProcessing/CrossPlatformStructurePostProcessor.h"
 #include "Parsing/PostProcessing/LeafsPostProcessor.h"
@@ -66,6 +67,7 @@ void CommandsFileReader::SetupPostProcessors()
     // Order is important
     m_post_processors.emplace_back(std::make_unique<CrossPlatformStructurePostProcessor>());
     m_post_processors.emplace_back(std::make_unique<CalculateSizeAndAlignPostProcessor>());
+    m_post_processors.emplace_back(std::make_unique<CalculateAllocAlignmentPostProcessor>());
     m_post_processors.emplace_back(std::make_unique<UsagesPostProcessor>());
     m_post_processors.emplace_back(std::make_unique<LeafsPostProcessor>());
     m_post_processors.emplace_back(std::make_unique<MarkingRequiredPostProcessor>());

@@ -1,5 +1,6 @@
 #include "ImageLoaderCommon.h"
 
+#include "Image/DdsLoader.h"
 #include "Image/ImageCommon.h"
 #include "Image/IwiLoader.h"
 #include "Image/Texture.h"
@@ -55,9 +56,24 @@ namespace image
         LoadImageCommon(const std::string& imageName, ISearchPath& searchPath, IwiVersion expectedIwiVersion, CommonImageLoaderHashType hashType)
     {
         const auto fileName = image::GetFileNameForAsset(imageName, ".iwi");
-        const auto file = searchPath.Open(fileName);
+        auto file = searchPath.Open(fileName);
+
         if (!file.IsOpen())
-            return NoAction();
+        {
+            const auto ddsFileName = image::GetFileNameForAsset(imageName, ".dds");
+            const auto ddsFile = searchPath.Open(ddsFileName);
+            if (!ddsFile.IsOpen())
+                return NoAction();
+
+            auto ddsTexture = image::LoadDds(*ddsFile.m_stream);
+            if (!ddsTexture)
+            {
+                con::error("Failed to load texture from: {}", ddsFileName);
+                return Failure();
+            }
+
+            return Success(0u, CommonIwiMetaData{}, std::move(ddsTexture), CommonImageLoaderHash{});
+        }
 
         const auto fileSize = static_cast<size_t>(file.m_length);
 

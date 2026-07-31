@@ -1,0 +1,24 @@
+#options GAME (IW4, IW4MS)
+
+#filename "Game/" + GAME + "/Techset/VertexDeclJsonDumper" + GAME + ".h"
+
+#set GAME_HEADER "\"Game/" + GAME + "/" + GAME + ".h\""
+#set CLASS_NAME "VertexDeclJsonDumper" + GAME
+
+// This file was templated.
+// See VertexDeclJsonDumper.h.template.
+// Do not modify, changes will be lost.
+
+#pragma once
+
+#include "Dumping/AbstractAssetDumper.h"
+#include GAME_HEADER
+
+namespace techset
+{
+    class CLASS_NAME final : public AbstractAssetDumper<GAME::AssetVertexDecl>
+    {
+    protected:
+        void DumpAsset(AssetDumpingContext& context, const XAssetInfo<GAME::AssetVertexDecl::Type>& asset) override;
+    };
+} // namespace techset

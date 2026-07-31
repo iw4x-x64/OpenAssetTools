@@ -1,0 +1,31 @@
+#options GAME (IW4, IW4MS)
+
+#filename "Game/" + GAME + "/World/ClipMapJsonDumper" + GAME + ".h"
+
+#set GAME_HEADER "\"Game/" + GAME + "/" + GAME + ".h\""
+#set SP_CLASS_NAME "ClipMapSpJsonDumper" + GAME
+#set MP_CLASS_NAME "ClipMapMpJsonDumper" + GAME
+
+// This file was templated.
+// See ClipMapJsonDumper.h.template.
+// Do not modify, changes will be lost.
+
+#pragma once
+
+#include "Dumping/AbstractAssetDumper.h"
+#include GAME_HEADER
+
+namespace world
+{
+    class SP_CLASS_NAME final : public AbstractAssetDumper<GAME::AssetClipMapSp>
+    {
+    protected:
+        void DumpAsset(AssetDumpingContext& context, const XAssetInfo<GAME::AssetClipMapSp::Type>& asset) override;
+    };
+
+    class MP_CLASS_NAME final : public AbstractAssetDumper<GAME::AssetClipMapMp>
+    {
+    protected:
+        void DumpAsset(AssetDumpingContext& context, const XAssetInfo<GAME::AssetClipMapMp::Type>& asset) override;
+    };
+} // namespace world

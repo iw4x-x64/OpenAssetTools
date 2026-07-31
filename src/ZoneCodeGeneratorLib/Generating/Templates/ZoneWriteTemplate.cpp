@@ -813,7 +813,7 @@ namespace
             }
             else
             {
-                LINEF("m_stream->Align({0});", modifier.GetAlignment())
+                LINEF("m_stream->Align({0});", modifier.GetAllocAlignment())
             }
 
             WriteMember_InsertReuse(info, member, modifier, writeType);
@@ -1478,7 +1478,7 @@ namespace
 
         void PrintWritePtrArrayMethod_Loading(const DataDefinition* def, const StructureInformation* info, const bool reusable) const
         {
-            const auto alignment = info && def == info->m_definition ? MakeAllocAlignment(*info) : std::to_string(def->GetAlignment());
+            const auto alignment = info && def == info->m_definition ? MakeAllocAlignment(*info) : std::to_string(def->GetAllocAlignment());
             LINEF("m_stream->Align({0});", alignment)
 
             if (reusable)

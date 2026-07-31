@@ -26,6 +26,12 @@ public:
 
     [[nodiscard]] virtual DataDefinitionType GetType() const = 0;
     [[nodiscard]] virtual unsigned GetAlignment() const = 0;
+
+    [[nodiscard]] virtual unsigned GetAllocAlignment() const
+    {
+        return GetAlignment();
+    }
+
     [[nodiscard]] virtual bool GetForceAlignment() const = 0;
     [[nodiscard]] virtual unsigned GetSize() const = 0;
 

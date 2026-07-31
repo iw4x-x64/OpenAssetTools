@@ -1,4 +1,4 @@
-#options GAME (IW3, IW4, IW5, T4, T5, T6)
+#options GAME (IW3, IW4, IW4MS, IW5, T4, T5, T6)
 
 #filename "Game/" + GAME + "/Material/MaterialJsonDumper" + GAME + ".cpp"
 
@@ -8,6 +8,12 @@
 #define GAME_LOWER "iw3"
 #elif GAME == "IW4"
 #define FEATURE_IW4
+#define HAS_WATER
+#define GAME_LOWER "iw4"
+#elif GAME == "IW4MS"
+// IW4MS shares the IW4 content model, so it takes the same branches as IW4.
+#define FEATURE_IW4
+#define FEATURE_IW4MS
 #define HAS_WATER
 #define GAME_LOWER "iw4"
 #elif GAME == "IW5"
@@ -128,11 +134,27 @@ namespace
             jWater.codeConstant[2] = water.codeConstant[2];
             jWater.codeConstant[3] = water.codeConstant[3];
 
+#ifdef FEATURE_IW4MS
+            // This build stores H0 as two planar float arrays rather than one interleaved
+            // complex_s array, so the two halves are emitted separately.
+            if (water.H0Part0)
+            {
+                const auto count = water.M * water.N;
+                jWater.h0 = base64::EncodeBase64(water.H0Part0, sizeof(float) * count);
+            }
+
+            if (water.H0Part1)
+            {
+                const auto count = water.M * water.N;
+                jWater.h0Part1 = base64::EncodeBase64(water.H0Part1, sizeof(float) * count);
+            }
+#else
             if (water.H0)
             {
                 const auto count = water.M * water.N;
                 jWater.h0 = base64::EncodeBase64(water.H0, sizeof(complex_s) * count);
             }
+#endif
 
             if (water.wTerm)
             {

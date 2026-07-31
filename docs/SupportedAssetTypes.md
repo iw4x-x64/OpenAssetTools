@@ -43,33 +43,33 @@ using `Linker`):
 | Asset Type                | Dumping Support | Loading Support | Notes                                                                        |
 |---------------------------|-----------------|-----------------|------------------------------------------------------------------------------|
 | PhysPreset                | ✅               | ✅               |                                                                              |
-| PhysCollmap               | ❌               | ❌               |                                                                              |
+| PhysCollmap               | ✅               | ❌               |                                                                              |
 | XAnimParts                | ✅               | ✅               |                                                                              |
 | XModel                    | ✅               | ✅               | Model data can be exported to `XMODEL_EXPORT/XMODEL_BIN`, `OBJ`, `GLB/GLTF`. |
 | Material                  | ✅               | ✅               |                                                                              |
 | MaterialPixelShader       | ✅               | ✅               | Only dumps/loads shader bytecode.                                            |
 | MaterialVertexShader      | ✅               | ✅               | Only dumps/loads shader bytecode.                                            |
-| MaterialVertexDeclaration | ✅               | ✅               |                                                                              |
+| MaterialVertexDeclaration | ✅               | ✅               | Dumped as JSON. No source format exists for it.                              |
 | MaterialTechniqueSet      | ✅               | ✅               |                                                                              |
-| GfxImage                  | ✅               | ❌               | A few special image encodings are not yet supported.                         |
-| snd_alias_list_t          | ❌               | ❌               |                                                                              |
+| GfxImage                  | ✅               | ✅               | Includes the wavelet formats.                                                |
+| snd_alias_list_t          | ✅               | ❌               | Dumped as CSV. Some `flags` bits are still unidentified.                     |
 | SndCurve                  | ✅               | ✅               |                                                                              |
 | LoadedSound               | ✅               | ❌               |                                                                              |
-| clipMap_t                 | ❌               | ❌               |                                                                              |
-| ComWorld                  | ❌               | ❌               |                                                                              |
-| GameWorldSp               | ❌               | ❌               |                                                                              |
-| GameWorldMp               | ❌               | ❌               |                                                                              |
+| clipMap_t                 | ✅               | ❌               | JSON. Compiled map output: a `.map` compiles into it and cannot be recovered.|
+| ComWorld                  | ✅               | ❌               | JSON, as above.                                                              |
+| GameWorldSp               | ✅               | ❌               | JSON, as above.                                                              |
+| GameWorldMp               | ✅               | ❌               | JSON, as above.                                                              |
 | MapEnts                   | ⁉️              | ❌               | Entity string can be exported. Binary data currently not.                    |
-| FxWorld                   | ❌               | ❌               |                                                                              |
-| GfxWorld                  | ❌               | ❌               |                                                                              |
+| FxWorld                   | ✅               | ❌               | JSON, as above.                                                              |
+| GfxWorld                  | ✅               | ❌               | JSON, as above.                                                              |
 | GfxLightDef               | ✅               | ✅               |                                                                              |
 | Font_s                    | ✅               | ✅               |                                                                              |
 | MenuList                  | ✅               | ✅               | The output is decompiled. The result will not be the same as the input.      |
 | menuDef_t                 | ✅               | ✅               | See menulist.                                                                |
 | LocalizeEntry             | ✅               | ✅               |                                                                              |
 | WeaponCompleteDef         | ✅               | ✅               |                                                                              |
-| FxEffectDef               | ❌               | ❌               |                                                                              |
-| FxImpactTable             | ❌               | ❌               |                                                                              |
+| FxEffectDef               | ✅               | ❌               | Dumped as `.efx`.                                                            |
+| FxImpactTable             | ✅               | ❌               | JSON. No source format exists for it.                                        |
 | RawFile                   | ✅               | ✅               |                                                                              |
 | StringTable               | ✅               | ✅               |                                                                              |
 | LeaderboardDef            | ✅               | ✅               |                                                                              |
@@ -77,6 +77,54 @@ using `Linker`):
 | TracerDef                 | ✅               | ✅               |                                                                              |
 | VehicleDef                | ✅               | ✅               |                                                                              |
 | AddonMapEnts              | ⁉️              | ❌               | MapEnts String can be exported. Binary data currently not.                   |
+
+## IW4MS (Call of Duty: Modern Warfare 2 - Microsoft x64 release)
+
+The retail Microsoft Store / GDK x64 release. Same content as IW4,
+different fastfile format. Needs an x64 build, and has to be named
+explicitly with `--game IW4MS` because its header is byte for byte
+identical to IW4's.
+
+Every type retail data actually contains is dumped. The nine that never occur are omitted
+from this table.
+
+| Asset Type                | Dumping Support | Loading Support | Notes                                                                          |
+|---------------------------|-----------------|-----------------|--------------------------------------------------------------------------------|
+| PhysPreset                | ✅               | ✅               |                                                                                |
+| PhysCollmap               | ✅               | ❌               |                                                                                |
+| XAnimParts                | ✅               | ✅               |                                                                                |
+| XModel                    | ✅               | ✅               | Model data can be exported to `XMODEL_EXPORT/XMODEL_BIN`, `OBJ`, `GLB/GLTF`.   |
+| Material                  | ✅               | ✅               |                                                                                |
+| MaterialPixelShader       | ✅               | ✅               | Only dumps/loads shader bytecode.                                              |
+| MaterialVertexShader      | ✅               | ✅               | Only dumps/loads shader bytecode.                                              |
+| MaterialVertexDeclaration | ✅               | ✅               | Dumped as JSON. No source format exists for it.                                |
+| MaterialTechniqueSet      | ✅               | ✅               |                                                                                |
+| GfxImage                  | ✅               | ✅               | Includes the wavelet formats, which no other target decodes yet.               |
+| snd_alias_list_t          | ✅               | ❌               | Dumped as CSV. Some `flags` bits are still unidentified, see Q-010.            |
+| SndCurve                  | ✅               | ✅               |                                                                                |
+| LoadedSound               | ✅               | ❌               |                                                                                |
+| clipMap_t                 | ✅               | ❌               | JSON. Compiled map output: a `.map` compiles into it and cannot be recovered. |
+| ComWorld                  | ✅               | ❌               | JSON, as above.                                                                |
+| GameWorldSp               | ✅               | ❌               | JSON, as above.                                                                |
+| GameWorldMp               | ✅               | ❌               | JSON, as above.                                                                |
+| MapEnts                   | ⁉️               | ❌               | Entity string can be exported. Binary data currently not.                      |
+| FxWorld                   | ✅               | ❌               | JSON, as above.                                                                |
+| GfxWorld                  | ✅               | ❌               | JSON, as above.                                                                |
+| GfxLightDef               | ✅               | ✅               |                                                                                |
+| Font_s                    | ✅               | ✅               |                                                                                |
+| MenuList                  | ✅               | ✅               | The output is decompiled. The result will not be the same as the input.        |
+| menuDef_t                 | ✅               | ✅               | See menulist.                                                                  |
+| LocalizeEntry             | ✅               | ✅               |                                                                                |
+| WeaponCompleteDef         | ✅               | ✅               |                                                                                |
+| FxEffectDef               | ✅               | ❌               | Dumped as `.efx`.                                                              |
+| FxImpactTable             | ✅               | ❌               | JSON. No source format exists for it.                                          |
+| RawFile                   | ✅               | ✅               |                                                                                |
+| StringTable               | ✅               | ✅               |                                                                                |
+| LeaderboardDef            | ✅               | ✅               |                                                                                |
+| StructuredDataDefSet      | ✅               | ✅               | The format is custom due to lacking information about original format.         |
+| TracerDef                 | ✅               | ✅               |                                                                                |
+| VehicleDef                | ✅               | ✅               |                                                                                |
+| AddonMapEnts              | ⁉️              | ❌                | MapEnts String can be exported. Binary data currently not.                     |
 
 ## IW5 (Call of Duty: Modern Warfare 3)
 

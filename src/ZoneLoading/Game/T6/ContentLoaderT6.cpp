@@ -139,10 +139,6 @@ void ContentLoader::LoadXAssetArray(const bool atStreamStart, const size_t count
     {
         LoadXAsset(false);
         varXAsset++;
-
-#ifdef DEBUG_OFFSETS
-        m_stream.DebugOffsets(index);
-#endif
     }
 }
 

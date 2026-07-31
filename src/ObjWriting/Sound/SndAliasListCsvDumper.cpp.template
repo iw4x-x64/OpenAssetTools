@@ -1,0 +1,175 @@
+#options GAME (IW4, IW4MS)
+
+#filename "Game/" + GAME + "/Sound/SndAliasListCsvDumper" + GAME + ".cpp"
+
+#set WRITER_HEADER "\"SndAliasListCsvDumper" + GAME + ".h\""
+#set FLAGS_HEADER "\"Game/" + GAME + "/Sound/SoundAliasFlags" + GAME + ".h\""
+
+// This file was templated.
+// See SndAliasListCsvDumper.cpp.template.
+// Do not modify, changes will be lost.
+
+#include WRITER_HEADER
+
+#include "Csv/CsvStream.h"
+#include FLAGS_HEADER
+
+#include <format>
+
+using namespace GAME;
+
+namespace
+{
+    const std::string HEADERS[]{
+        "name",
+        "sequence",
+        "file",
+        "vol_min",
+        "vol_max",
+        "pitch_min",
+        "pitch_max",
+        "dist_min",
+        "dist_max",
+        "channel",
+        "type",
+        "probability",
+        "loop",
+        "masterslave",
+        "loadspec",
+        "subtitle",
+        "compression",
+        "secondaryaliasname",
+        "chainaliasname",
+        "mixergroup",
+        "volumefalloffcurve",
+        "startdelay",
+        "speakermap",
+        "reverb",
+        "lfe percentage",
+        "center percentage",
+        "platform",
+        "envelop_min",
+        "envelop_max",
+        "envelop percentage",
+        "velocity_min",
+    };
+
+    class Dumper
+    {
+    public:
+        explicit Dumper(std::ostream& stream)
+            : m_csv(stream)
+        {
+        }
+
+        void Dump(const snd_alias_list_t& aliasList)
+        {
+            for (const auto& header : HEADERS)
+                m_csv.WriteColumn(header);
+            m_csv.NextRow();
+
+            for (auto i = 0; i < aliasList.count; i++)
+                DumpAlias(aliasList.head[i]);
+        }
+
+    private:
+        static std::string Str(const char* value)
+        {
+            return value ? value : "";
+        }
+
+        static std::string Num(const float value)
+        {
+            return std::format("{}", value);
+        }
+
+        static std::string Num(const int value)
+        {
+            return std::format("{}", value);
+        }
+
+        static std::string SoundFileName(const SoundFile* soundFile)
+        {
+            if (!soundFile)
+                return "";
+
+            if (soundFile->type == SAT_LOADED)
+                return soundFile->u.loadSnd ? Str(soundFile->u.loadSnd->name) : "";
+
+            const auto dir = Str(soundFile->u.streamSnd.dir);
+            const auto name = Str(soundFile->u.streamSnd.name);
+
+            if (dir.empty())
+                return name;
+
+            return std::format("{}/{}", dir, name);
+        }
+
+        static std::string SoundFileType(const SoundFile* soundFile)
+        {
+            if (!soundFile)
+                return "";
+
+            return soundFile->type == SAT_LOADED ? "loaded" : "streamed";
+        }
+
+        void DumpAlias(const snd_alias_t& alias)
+        {
+            m_csv.WriteColumn(Str(alias.aliasName));
+            m_csv.WriteColumn(Num(alias.sequence));
+            m_csv.WriteColumn(SoundFileName(alias.soundFile));
+            m_csv.WriteColumn(Num(alias.volMin));
+            m_csv.WriteColumn(Num(alias.volMax));
+            m_csv.WriteColumn(Num(alias.pitchMin));
+            m_csv.WriteColumn(Num(alias.pitchMax));
+            m_csv.WriteColumn(Num(alias.distMin));
+            m_csv.WriteColumn(Num(alias.distMax));
+            m_csv.WriteColumn(Num(static_cast<int>(snd_alias_flags::Channel(alias.flags))));
+            m_csv.WriteColumn(SoundFileType(alias.soundFile));
+            m_csv.WriteColumn(Num(alias.probability));
+            m_csv.WriteColumn(snd_alias_flags::IsLooping(alias.flags) ? "looping" : "nonlooping");
+            m_csv.WriteColumn(snd_alias_flags::IsMaster(alias.flags) ? "master" : "");
+
+            m_csv.WriteColumn("");
+            m_csv.WriteColumn(Str(alias.subtitle));
+            m_csv.WriteColumn("");
+
+            m_csv.WriteColumn(Str(alias.secondaryAliasName));
+            m_csv.WriteColumn(Str(alias.chainAliasName));
+            m_csv.WriteColumn(Str(alias.mixerGroup));
+            m_csv.WriteColumn(alias.volumeFalloffCurve ? Str(alias.volumeFalloffCurve->filename) : "");
+            m_csv.WriteColumn(Num(alias.startDelay));
+            m_csv.WriteColumn(alias.speakerMap ? Str(alias.speakerMap->name) : "");
+
+            m_csv.WriteColumn(snd_alias_flags::Reverb(alias.flags));
+
+            m_csv.WriteColumn(Num(alias.lfePercentage));
+            m_csv.WriteColumn(Num(alias.centerPercentage));
+            m_csv.WriteColumn("");
+            m_csv.WriteColumn(Num(alias.envelopMin));
+            m_csv.WriteColumn(Num(alias.envelopMax));
+            m_csv.WriteColumn(Num(alias.envelopPercentage));
+            m_csv.WriteColumn(Num(alias.velocityMin));
+
+            m_csv.NextRow();
+        }
+
+        CsvOutputStream m_csv;
+    };
+} // namespace
+
+#set CLASS_NAME "CsvDumper" + GAME
+
+namespace sound
+{
+    void CLASS_NAME::DumpAsset(AssetDumpingContext& context, const XAssetInfo<AssetSound::Type>& asset)
+    {
+        const auto assetFile = context.OpenAssetFile(std::format("soundaliases/{}.csv", asset.m_name));
+
+        if (!assetFile)
+            return;
+
+        Dumper dumper(*assetFile);
+        dumper.Dump(*asset.Asset());
+    }
+} // namespace sound

@@ -7,6 +7,7 @@ DefinitionWithMembers::DefinitionWithMembers(std::string _namespace, std::string
       m_flags(0),
       m_size(0),
       m_alignment(0),
+      m_alloc_alignment(0),
       m_pack(pack)
 {
 }
@@ -16,6 +17,13 @@ unsigned DefinitionWithMembers::GetAlignment() const
     assert(m_flags & FLAG_FIELDS_CALCULATED);
 
     return m_alignment;
+}
+
+unsigned DefinitionWithMembers::GetAllocAlignment() const
+{
+    assert(m_flags & FLAG_FIELDS_CALCULATED);
+
+    return m_alloc_alignment != 0 ? m_alloc_alignment : m_alignment;
 }
 
 bool DefinitionWithMembers::GetForceAlignment() const

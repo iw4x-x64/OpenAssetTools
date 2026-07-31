@@ -91,6 +91,32 @@ const CommandLineOption* const OPTION_MODEL_FORMAT =
     .WithParameter("modelFormatValue")
     .Build();
 
+const CommandLineOption* const OPTION_GAME =
+    CommandLineOption::Builder::Create()
+    .WithLongName("game")
+    .WithDescription("Loads zones as the specified game instead of detecting the game from the fastfile header. "
+                     "Required for IW4MS, whose retail Microsoft x64 fastfiles have the same header as retail IW4 x86 ones. "
+                     "Valid values: IW3, IW4, IW4MS, IW5, T4, T5, T6.")
+    .WithParameter("gameName")
+    .Build();
+
+const CommandLineOption* const OPTION_CONVERT_TO =
+    CommandLineOption::Builder::Create()
+    .WithLongName("convert-to")
+    .WithDescription("Writes the loaded zone back out as the specified game instead of dumping its assets. "
+                     "Only IW4 to IW4MS is supported: they are the same game built for two word sizes, so the "
+                     "assets need no conversion. The result goes to the output folder as <zone>.ff.")
+    .WithParameter("gameName")
+    .Build();
+
+const CommandLineOption* const OPTION_TRACE_STREAM =
+    CommandLineOption::Builder::Create()
+    .WithLongName("trace-stream")
+    .WithDescription("Writes a machine readable record of every zone stream operation to the specified file. "
+                     "Two runs of the same zone produce identical traces, so diffing them locates the first divergent read.")
+    .WithParameter("traceFile")
+    .Build();
+
 const CommandLineOption* const OPTION_SKIP_OBJ =
     CommandLineOption::Builder::Create()
     .WithLongName("skip-obj")
@@ -139,6 +165,9 @@ const CommandLineOption* const COMMAND_LINE_OPTIONS[]{
     OPTION_SEARCH_PATH,
     OPTION_IMAGE_FORMAT,
     OPTION_MODEL_FORMAT,
+    OPTION_GAME,
+    OPTION_CONVERT_TO,
+    OPTION_TRACE_STREAM,
     OPTION_SKIP_OBJ,
     OPTION_GDT,
     OPTION_EXCLUDE_ASSETS,
@@ -353,6 +382,44 @@ bool UnlinkerArgs::ParseArgs(const int argc, const char** argv, bool& shouldCont
             return false;
         }
     }
+
+    // --convert-to
+    if (m_argument_parser.IsOptionSpecified(OPTION_CONVERT_TO))
+    {
+        const auto gameName = m_argument_parser.GetValueForOption(OPTION_CONVERT_TO);
+        m_convert_to_game = IGame::FindGameIdByName(gameName);
+
+        if (!m_convert_to_game)
+        {
+            con::error("Unknown game \"{}\" for --convert-to.", gameName);
+            return false;
+        }
+    }
+
+    // --game
+    if (m_argument_parser.IsOptionSpecified(OPTION_GAME))
+    {
+        const auto gameName = m_argument_parser.GetValueForOption(OPTION_GAME);
+        m_forced_game = IGame::FindGameIdByName(gameName);
+
+        if (!m_forced_game)
+        {
+            std::string knownGames;
+            for (const auto* knownGame : GameId_Names)
+            {
+                if (!knownGames.empty())
+                    knownGames += ", ";
+                knownGames += knownGame;
+            }
+
+            con::error("Unknown game \"{}\". Valid values are: {}", gameName, knownGames);
+            return false;
+        }
+    }
+
+    // --trace-stream
+    if (m_argument_parser.IsOptionSpecified(OPTION_TRACE_STREAM))
+        m_stream_trace_file = m_argument_parser.GetValueForOption(OPTION_TRACE_STREAM);
 
     // --skip-obj
     m_skip_obj = m_argument_parser.IsOptionSpecified(OPTION_SKIP_OBJ);

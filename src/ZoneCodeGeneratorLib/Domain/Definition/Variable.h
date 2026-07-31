@@ -11,6 +11,8 @@ public:
     Variable(std::string name, std::unique_ptr<TypeDeclaration> typeDeclaration);
 
     [[nodiscard]] unsigned GetAlignment() const;
+    /** \see DataDefinition::GetAllocAlignment */
+    [[nodiscard]] unsigned GetAllocAlignment() const;
     [[nodiscard]] bool GetForceAlignment() const;
 
     std::string m_name;

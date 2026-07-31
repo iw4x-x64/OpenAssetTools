@@ -1,0 +1,58 @@
+#pragma once
+
+#include "Game/IW4MS/IW4MS.h"
+
+#include "Json/JsonCommon.h"
+#include "Json/JsonExtension.h"
+#include <memory>
+#include <nlohmann/json.hpp>
+#include <optional>
+#include <string>
+#include <vector>
+
+namespace IW4MS
+{
+    NLOHMANN_JSON_SERIALIZE_ENUM(LbColType,
+                                 {
+                                     {LBCOL_TYPE_NUMBER,    "number"   },
+                                     {LBCOL_TYPE_TIME,      "time"     },
+                                     {LBCOL_TYPE_LEVELXP,   "levelxp"  },
+                                     {LBCOL_TYPE_PRESTIGE,  "prestige" },
+                                     {LBCOL_TYPE_BIGNUMBER, "bignumber"},
+                                     {LBCOL_TYPE_PERCENT,   "percent"  },
+    });
+
+    NLOHMANN_JSON_SERIALIZE_ENUM(LbAggType,
+                                 {
+                                     {LBAGG_TYPE_MIN,  "min" },
+                                     {LBAGG_TYPE_MAX,  "max" },
+                                     {LBAGG_TYPE_SUM,  "sum" },
+                                     {LBAGG_TYPE_LAST, "last"},
+    });
+
+    class JsonColumnDef
+    {
+    public:
+        std::string name;
+        int colId;
+        std::optional<int> propertyId;
+        std::optional<bool> hidden;
+        std::optional<std::string> statName;
+        LbColType type;
+        std::optional<int> precision;
+        LbAggType aggregationFunction;
+    };
+
+    NLOHMANN_DEFINE_TYPE_EXTENSION(JsonColumnDef, name, colId, propertyId, hidden, statName, type, precision, aggregationFunction);
+
+    class JsonLeaderboardDef
+    {
+    public:
+        int id;
+        std::optional<int> xpColId;
+        std::optional<int> prestigeColId;
+        std::vector<JsonColumnDef> columns;
+    };
+
+    NLOHMANN_DEFINE_TYPE_EXTENSION(JsonLeaderboardDef, id, xpColId, prestigeColId, columns);
+} // namespace IW4MS

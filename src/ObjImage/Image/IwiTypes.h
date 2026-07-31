@@ -8,8 +8,10 @@ namespace image
     {
         // IW3
         IWI_6 = 6,
-        // IW4, IW5
+        // IW4
         IWI_8 = 8,
+        // IW5
+        IWI_9 = 9,
         // T5
         IWI_13 = 13,
         // T6

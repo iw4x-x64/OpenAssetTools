@@ -1,0 +1,36 @@
+// =========================================
+// snd_alias_list_t
+// =========================================
+use snd_alias_list_t;
+set block XFILE_BLOCK_TEMP;
+set string aliasName;
+set reusable head;
+set count head count;
+
+// snd_alias_t
+use snd_alias_t;
+set string aliasName;
+set string subtitle;
+set string secondaryAliasName;
+set string chainAliasName;
+set string mixerGroup;
+set reusable soundFile;
+set reusable speakerMap;
+
+// SoundFile
+set condition SoundFile::u::loadSnd type == SAT_LOADED;
+
+// SpeakerMap
+set string SpeakerMap::name;
+
+// MSSSpeakerLevels
+// Load_MSSChannelMap at 0x14011C2D0 reads the level array as `shl r8d, 3` bytes from the byte count
+// at +0, after a DB_AllocStreamPos(3). The x86 model keeps these levels inline instead, so this
+// array does not exist there at all.
+use MSSSpeakerLevels;
+set count levels levelCount;
+
+// StreamedSound
+use StreamedSound;
+set string dir;
+set string name;

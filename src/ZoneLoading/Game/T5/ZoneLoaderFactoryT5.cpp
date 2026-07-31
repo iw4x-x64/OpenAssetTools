@@ -90,6 +90,7 @@ std::unique_ptr<ZoneLoader> ZoneLoaderFactory::CreateLoaderForHeader(const ZoneH
         },
         32u,
         ZoneConstants::OFFSET_BLOCK_BIT_COUNT,
+        ZoneConstants::OFFSET_BIT_COUNT,
         ZoneConstants::INSERT_BLOCK,
         zonePtr->Memory(),
         std::move(progressCallback)));

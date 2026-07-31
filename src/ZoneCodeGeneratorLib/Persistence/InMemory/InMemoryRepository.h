@@ -27,6 +27,9 @@ public:
     [[nodiscard]] WordSize GetWordSize() const override;
     void SetWordSize(WordSize wordSize) override;
 
+    [[nodiscard]] WordSize GetAllocAlignmentWordSize() const override;
+    void SetAllocAlignmentWordSize(WordSize wordSize) override;
+
     [[nodiscard]] const std::vector<EnumDefinition*>& GetAllEnums() const override;
     [[nodiscard]] const std::vector<StructDefinition*>& GetAllStructs() const override;
     [[nodiscard]] const std::vector<UnionDefinition*>& GetAllUnions() const override;
@@ -55,4 +58,5 @@ private:
     std::unordered_map<const DataDefinition*, TypeInformation*> m_type_information_by_definition;
     std::string m_game_name;
     WordSize m_word_size;
+    WordSize m_alloc_alignment_word_size;
 };

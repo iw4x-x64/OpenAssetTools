@@ -1,4 +1,4 @@
-#options GAME (IW3, IW4, IW5, T4, T5, T6)
+#options GAME (IW3, IW4, IW4MS, IW5, T4, T5, T6)
 
 #filename "Game/" + GAME + "/Font/FontCompiler" + GAME + ".cpp"
 
@@ -7,6 +7,12 @@
 #define IWI_NS iwi6
 #define GAME_LOWER "iw3"
 #elif GAME == "IW4"
+#define FEATURE_IW4
+#define IWI_NS iwi8
+#define GAME_LOWER "iw4"
+#elif GAME == "IW4MS"
+// IW4MS shares the IW4 content model, so it takes the same branches as IW4.
+#define FEATURE_IW4MS
 #define FEATURE_IW4
 #define IWI_NS iwi8
 #define GAME_LOWER "iw4"

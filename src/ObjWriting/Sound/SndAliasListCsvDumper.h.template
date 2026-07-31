@@ -1,0 +1,24 @@
+#options GAME (IW4, IW4MS)
+
+#filename "Game/" + GAME + "/Sound/SndAliasListCsvDumper" + GAME + ".h"
+
+#set GAME_HEADER "\"Game/" + GAME + "/" + GAME + ".h\""
+#set CLASS_NAME "CsvDumper" + GAME
+
+// This file was templated.
+// See SndAliasListCsvDumper.h.template.
+// Do not modify, changes will be lost.
+
+#pragma once
+
+#include "Dumping/AbstractAssetDumper.h"
+#include GAME_HEADER
+
+namespace sound
+{
+    class CLASS_NAME final : public AbstractAssetDumper<GAME::AssetSound>
+    {
+    protected:
+        void DumpAsset(AssetDumpingContext& context, const XAssetInfo<GAME::AssetSound::Type>& asset) override;
+    };
+} // namespace sound

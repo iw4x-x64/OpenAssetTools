@@ -1,4 +1,4 @@
-#options GAME(IW3, IW4, IW5, T5, T6)
+#options GAME(IW3, IW4, IW4MS, IW5, T5, T6)
 
 #filename "Game/" + GAME + "/Techset/VertexShaderLoader" + GAME + ".cpp"
 
@@ -10,6 +10,11 @@
 #define IS_DX9
 #define IS_SUB_ASSET
 #elif GAME == "IW4"
+#define FEATURE_IW4
+#define IS_DX9
+#elif GAME == "IW4MS"
+// IW4MS shares the IW4 content model, so it takes the same branches as IW4.
+#define FEATURE_IW4MS
 #define FEATURE_IW4
 #define IS_DX9
 #elif GAME == "IW5"

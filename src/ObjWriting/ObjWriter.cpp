@@ -2,6 +2,7 @@
 
 #include "Game/IW3/ObjWriterIW3.h"
 #include "Game/IW4/ObjWriterIW4.h"
+#include "Game/IW4MS/ObjWriterIW4MS.h"
 #include "Game/IW5/ObjWriterIW5.h"
 #include "Game/T4/ObjWriterT4.h"
 #include "Game/T5/ObjWriterT5.h"
@@ -44,6 +45,7 @@ IObjWriter* IObjWriter::GetObjWriterForGame(GameId game)
     static IObjWriter* objWriters[]{
         new IW3::ObjWriter(),
         new IW4::ObjWriter(),
+        new IW4MS::ObjWriter(),
         new IW5::ObjWriter(),
         new T4::ObjWriter(),
         new T5::ObjWriter(),

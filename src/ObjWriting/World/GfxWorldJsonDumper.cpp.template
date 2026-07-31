@@ -1,0 +1,470 @@
+#options GAME (IW4, IW4MS)
+
+#filename "Game/" + GAME + "/World/GfxWorldJsonDumper" + GAME + ".cpp"
+
+#set WRITER_HEADER "\"GfxWorldJsonDumper" + GAME + ".h\""
+#set CLASS_NAME "GfxWorldJsonDumper" + GAME
+#set GAME_LOWER_NAME "\"iw4\""
+
+// This file was templated.
+// See GfxWorldJsonDumper.cpp.template.
+// Do not modify, changes will be lost.
+
+#include WRITER_HEADER
+
+#include "Dumping/AssetDumpingContext.h"
+#include "World/WorldJsonCommon.h"
+
+#include <iomanip>
+#include <nlohmann/json.hpp>
+
+using namespace nlohmann;
+using namespace GAME;
+
+namespace
+{
+    class Dumper
+    {
+    public:
+        explicit Dumper(std::ostream& stream)
+            : m_stream(stream)
+        {
+        }
+
+        void Dump(const GfxWorld& gfxWorld) const
+        {
+            json jRoot;
+
+            jRoot["_type"] = "gfxworld";
+            jRoot["_version"] = 1;
+            jRoot["_game"] = GAME_LOWER_NAME;
+
+            jRoot["baseName"] = gfxWorld.baseName ? gfxWorld.baseName : "";
+            jRoot["checksum"] = gfxWorld.checksum;
+            jRoot["mapVtxChecksum"] = gfxWorld.mapVtxChecksum;
+            jRoot["bounds"] = Bounds(gfxWorld.bounds);
+            jRoot["fogTypesAllowed"] = static_cast<int>(gfxWorld.fogTypesAllowed);
+
+            jRoot["sortKeys"] = {
+                {"litDecal",    gfxWorld.sortKeyLitDecal   },
+                {"effectDecal", gfxWorld.sortKeyEffectDecal},
+                {"effectAuto",  gfxWorld.sortKeyEffectAuto },
+                {"distortion",  gfxWorld.sortKeyDistortion },
+            };
+
+            jRoot["primaryLightCount"] = gfxWorld.primaryLightCount;
+            jRoot["lastSunPrimaryLightIndex"] = gfxWorld.lastSunPrimaryLightIndex;
+
+            jRoot["skies"] = world::Array(gfxWorld.skies,
+                                          static_cast<size_t>(gfxWorld.skyCount),
+                                          [](const GfxSky& sky)
+                                          {
+                                              return json{
+                                                  {"skyStartSurfs", world::Array(sky.skyStartSurfs, static_cast<size_t>(sky.skySurfCount))},
+                                                  {"skyImage", dumping::ReferencedAssetName(sky.skyImage ? sky.skyImage->name : nullptr)},
+                                                  {"skySamplerState", static_cast<int>(sky.skySamplerState)},
+                                              };
+                                          });
+
+            jRoot["dpvsPlanes"] = CreateDpvsPlanes(gfxWorld);
+            jRoot["cells"] = CreateCells(gfxWorld);
+            jRoot["draw"] = CreateDraw(gfxWorld.draw);
+            jRoot["lightGrid"] = CreateLightGrid(gfxWorld.lightGrid);
+
+            jRoot["models"] = world::Array(gfxWorld.models,
+                                           static_cast<size_t>(gfxWorld.modelCount),
+                                           [](const GfxBrushModel& model)
+                                           {
+                                               return json{
+                                                   {"bounds",              Bounds(model.bounds)  },
+                                                   {"radius",              model.radius          },
+                                                   {"surfaceCount",        model.surfaceCount    },
+                                                   {"startSurfIndex",      model.startSurfIndex  },
+                                                   {"surfaceCountNoDecal", model.surfaceCountNoDecal},
+                                               };
+                                           });
+
+            jRoot["materialMemory"] = world::Array(gfxWorld.materialMemory,
+                                                   static_cast<size_t>(gfxWorld.materialMemoryCount),
+                                                   [](const MaterialMemory& memory)
+                                                   {
+                                                       return json{
+                                                           {"material", dumping::ReferencedAssetName(memory.material ? memory.material->info.name : nullptr)},
+                                                           {"memory",   memory.memory},
+                                                       };
+                                                   });
+
+            jRoot["sun"] = CreateSun(gfxWorld.sun);
+
+            auto jOutdoor = json::array();
+            for (const auto& row : gfxWorld.outdoorLookupMatrix)
+                jOutdoor.emplace_back(world::Vec4(row));
+            jRoot["outdoorLookupMatrix"] = std::move(jOutdoor);
+            jRoot["outdoorImage"] = dumping::ReferencedAssetName(gfxWorld.outdoorImage ? gfxWorld.outdoorImage->name : nullptr);
+
+            jRoot["shadowGeom"] = world::Array(gfxWorld.shadowGeom,
+                                               gfxWorld.primaryLightCount,
+                                               [](const GfxShadowGeometry& geom)
+                                               {
+                                                   return json{
+                                                       {"sortedSurfIndex", world::Array(geom.sortedSurfIndex, geom.surfaceCount)},
+                                                       {"smodelIndex",     world::Array(geom.smodelIndex, geom.smodelCount)     },
+                                                   };
+                                               });
+
+            jRoot["lightRegion"] = world::Array(gfxWorld.lightRegion,
+                                                gfxWorld.primaryLightCount,
+                                                [](const GfxLightRegion& region)
+                                                {
+                                                    return json{
+                                                        {"hulls", world::Array(region.hulls, region.hullCount, CreateLightRegionHull)},
+                                                    };
+                                                });
+
+            jRoot["dpvs"] = CreateDpvsStatic(gfxWorld);
+            jRoot["dpvsDyn"] = {
+                {"dynEntClientWordCount",
+                 json::array({gfxWorld.dpvsDyn.dynEntClientWordCount[0], gfxWorld.dpvsDyn.dynEntClientWordCount[1]})},
+                {"dynEntClientCount", json::array({gfxWorld.dpvsDyn.dynEntClientCount[0], gfxWorld.dpvsDyn.dynEntClientCount[1]})},
+            };
+
+            jRoot["heroOnlyLights"] = world::Array(gfxWorld.heroOnlyLights,
+                                                   gfxWorld.heroOnlyLightCount,
+                                                   [](const GfxHeroOnlyLight& light)
+                                                   {
+                                                       return json{
+                                                           {"type",             static_cast<int>(light.type)},
+                                                           {"color",            world::Vec3(light.color)    },
+                                                           {"dir",              world::Vec3(light.dir)      },
+                                                           {"origin",           world::Vec3(light.origin)   },
+                                                           {"radius",           light.radius                },
+                                                           {"cosHalfFovOuter",  light.cosHalfFovOuter       },
+                                                           {"cosHalfFovInner",  light.cosHalfFovInner       },
+                                                           {"exponent",         light.exponent              },
+                                                       };
+                                                   });
+
+            m_stream << std::setw(4) << jRoot << "\n";
+        }
+
+    private:
+        [[nodiscard]] static json Bounds(const ::GAME::Bounds& bounds)
+        {
+            return json{
+                {"midPoint", world::Vec3(bounds.midPoint.v)},
+                {"halfSize", world::Vec3(bounds.halfSize.v)},
+            };
+        }
+
+        [[nodiscard]] static json CreateDpvsPlanes(const GfxWorld& gfxWorld)
+        {
+            const auto& planes = gfxWorld.dpvsPlanes;
+
+            return json{
+                {"cellCount", planes.cellCount},
+                {"planes",
+                 world::Array(planes.planes,
+                              static_cast<size_t>(gfxWorld.planeCount),
+                              [](const cplane_s& plane)
+                              {
+                                  return json{
+                                      {"normal", world::Vec3(plane.normal)},
+                                      {"dist", plane.dist},
+                                      {"type", static_cast<int>(plane.type)},
+                                  };
+                              })                                                                       },
+                {"nodes", world::Base64(planes.nodes, static_cast<size_t>(gfxWorld.nodeCount) * sizeof(uint16_t))},
+            };
+        }
+
+        [[nodiscard]] static json CreateCells(const GfxWorld& gfxWorld)
+        {
+            const auto cellCount = static_cast<size_t>(gfxWorld.dpvsPlanes.cellCount);
+
+            auto jCells = json::array();
+            for (size_t i = 0; i < cellCount; i++)
+            {
+                json jCell;
+
+                if (gfxWorld.cells)
+                {
+                    const auto& cell = gfxWorld.cells[i];
+
+                    jCell["bounds"] = Bounds(cell.bounds);
+                    jCell["portals"] = world::Array(cell.portals, static_cast<size_t>(cell.portalCount), CreatePortal);
+                    jCell["reflectionProbes"] =
+                        world::Array(reinterpret_cast<const unsigned char*>(cell.reflectionProbes), static_cast<size_t>(cell.reflectionProbeCount));
+                }
+
+                if (gfxWorld.aabbTrees && gfxWorld.aabbTreeCounts)
+                {
+                    jCell["aabbTree"] = world::Array(gfxWorld.aabbTrees[i].aabbTree,
+                                                     static_cast<size_t>(gfxWorld.aabbTreeCounts[i]),
+                                                     CreateAabbTree);
+                }
+
+                jCells.emplace_back(std::move(jCell));
+            }
+
+            return jCells;
+        }
+
+        [[nodiscard]] static json CreatePortal(const GfxPortal& portal)
+        {
+            return json{
+                {"plane",       world::Vec4(portal.plane.coeffs)},
+                {"cellIndex",   portal.cellIndex                },
+                {"hullAxis",    json::array({world::Vec3(portal.hullAxis[0]), world::Vec3(portal.hullAxis[1])})},
+                {"vertices",
+                 world::Array(portal.vertices,
+                              static_cast<size_t>(portal.vertexCount),
+                              [](const vec3_t& vertex)
+                              {
+                                  return json::array({vertex.x, vertex.y, vertex.z});
+                              })                                },
+            };
+        }
+
+        [[nodiscard]] static json CreateAabbTree(const GfxAabbTree& tree)
+        {
+            return json{
+                {"bounds",                Bounds(tree.bounds)                                        },
+                {"childCount",            tree.childCount                                            },
+                {"surfaceCount",          tree.surfaceCount                                          },
+                {"startSurfIndex",        tree.startSurfIndex                                        },
+                {"surfaceCountNoDecal",   tree.surfaceCountNoDecal                                   },
+                {"startSurfIndexNoDecal", tree.startSurfIndexNoDecal                                 },
+                {"childrenOffset",        tree.childrenOffset                                        },
+                {"smodelIndexes",         world::Array(tree.smodelIndexes, tree.smodelIndexCount)    },
+            };
+        }
+
+        [[nodiscard]] static json CreateDraw(const GfxWorldDraw& draw)
+        {
+            json jDraw;
+
+            auto jProbes = json::array();
+            for (auto i = 0u; i < draw.reflectionProbeCount; i++)
+            {
+                json jProbe;
+                if (draw.reflectionProbes && draw.reflectionProbes[i])
+                    jProbe["image"] = dumping::ReferencedAssetName(draw.reflectionProbes[i]->name);
+                if (draw.reflectionProbeOrigins)
+                    jProbe["origin"] = world::Vec3(draw.reflectionProbeOrigins[i].origin);
+                jProbes.emplace_back(std::move(jProbe));
+            }
+            jDraw["reflectionProbes"] = std::move(jProbes);
+
+            jDraw["lightmaps"] = world::Array(draw.lightmaps,
+                                              static_cast<size_t>(draw.lightmapCount),
+                                              [](const GfxLightmapArray& lightmap)
+                                              {
+                                                  return json{
+                                                      {"primary",   dumping::ReferencedAssetName(lightmap.primary ? lightmap.primary->name : nullptr)},
+                                                      {"secondary", dumping::ReferencedAssetName(lightmap.secondary ? lightmap.secondary->name : nullptr)},
+                                                  };
+                                              });
+
+            jDraw["lightmapOverridePrimary"] =
+                dumping::ReferencedAssetName(draw.lightmapOverridePrimary ? draw.lightmapOverridePrimary->name : nullptr);
+            jDraw["lightmapOverrideSecondary"] =
+                dumping::ReferencedAssetName(draw.lightmapOverrideSecondary ? draw.lightmapOverrideSecondary->name : nullptr);
+
+            jDraw["vertexCount"] = draw.vertexCount;
+            jDraw["vertices"] = world::Base64(draw.vd.vertices, static_cast<size_t>(draw.vertexCount) * sizeof(GfxWorldVertex));
+            jDraw["vertexLayerDataSize"] = draw.vertexLayerDataSize;
+            jDraw["vertexLayerData"] = world::Base64(draw.vld.data, draw.vertexLayerDataSize);
+            jDraw["indexCount"] = draw.indexCount;
+            jDraw["indices"] = world::Base64(draw.indices, static_cast<size_t>(draw.indexCount) * sizeof(r_index_t));
+
+            return jDraw;
+        }
+
+        [[nodiscard]] static json CreateLightGrid(const GfxLightGrid& grid)
+        {
+            const auto rowCount = grid.maxs[grid.rowAxis] >= grid.mins[grid.rowAxis]
+                                      ? static_cast<size_t>(grid.maxs[grid.rowAxis] - grid.mins[grid.rowAxis]) + 1u
+                                      : 0u;
+
+            return json{
+                {"hasLightRegions",          grid.hasLightRegions                                        },
+                {"lastSunPrimaryLightIndex", grid.lastSunPrimaryLightIndex                               },
+                {"mins",                     json::array({grid.mins[0], grid.mins[1], grid.mins[2]})     },
+                {"maxs",                     json::array({grid.maxs[0], grid.maxs[1], grid.maxs[2]})     },
+                {"rowAxis",                  grid.rowAxis                                                },
+                {"colAxis",                  grid.colAxis                                                },
+                {"rowDataStart",             world::Array(grid.rowDataStart, rowCount)                   },
+                {"rawRowData",               world::Base64(grid.rawRowData, grid.rawRowDataSize)         },
+                {"entries",
+                 world::Array(grid.entries,
+                              grid.entryCount,
+                              [](const GfxLightGridEntry& entry)
+                              {
+                                  return json{
+                                      {"colorsIndex", entry.colorsIndex},
+                                      {"primaryLightIndex", static_cast<int>(entry.primaryLightIndex)},
+                                      {"needsTrace", static_cast<int>(entry.needsTrace)},
+                                  };
+                              })                                                                         },
+                {"colorCount",               grid.colorCount                                             },
+                {"colors",                   world::Base64(grid.colors, static_cast<size_t>(grid.colorCount) * sizeof(GfxLightGridColors))},
+            };
+        }
+
+        [[nodiscard]] static json CreateLightRegionHull(const GfxLightRegionHull& hull)
+        {
+            auto jMid = json::array();
+            auto jHalf = json::array();
+            for (auto i = 0u; i < 9u; i++)
+            {
+                jMid.emplace_back(hull.kdopMidPoint[i]);
+                jHalf.emplace_back(hull.kdopHalfSize[i]);
+            }
+
+            return json{
+                {"kdopMidPoint", std::move(jMid) },
+                {"kdopHalfSize", std::move(jHalf)},
+                {"axis",
+                 world::Array(hull.axis,
+                              hull.axisCount,
+                              [](const GfxLightRegionAxis& axis)
+                              {
+                                  return json{
+                                      {"dir", world::Vec3(axis.dir)},
+                                      {"midPoint", axis.midPoint},
+                                      {"halfSize", axis.halfSize},
+                                  };
+                              })                 },
+            };
+        }
+
+        [[nodiscard]] static json CreateSun(const sunflare_t& sun)
+        {
+            return json{
+                {"hasValidData",     sun.hasValidData                                                             },
+                {"spriteMaterial",   dumping::ReferencedAssetName(sun.spriteMaterial ? sun.spriteMaterial->info.name : nullptr)},
+                {"flareMaterial",    dumping::ReferencedAssetName(sun.flareMaterial ? sun.flareMaterial->info.name : nullptr)},
+                {"spriteSize",       sun.spriteSize                                                               },
+                {"flareMinSize",     sun.flareMinSize                                                             },
+                {"flareMinDot",      sun.flareMinDot                                                              },
+                {"flareMaxSize",     sun.flareMaxSize                                                             },
+                {"flareMaxDot",      sun.flareMaxDot                                                              },
+                {"flareMaxAlpha",    sun.flareMaxAlpha                                                            },
+                {"flareFadeInTime",  sun.flareFadeInTime                                                          },
+                {"flareFadeOutTime", sun.flareFadeOutTime                                                         },
+                {"blindMinDot",      sun.blindMinDot                                                              },
+                {"blindMaxDot",      sun.blindMaxDot                                                              },
+                {"blindMaxDarken",   sun.blindMaxDarken                                                           },
+                {"blindFadeInTime",  sun.blindFadeInTime                                                          },
+                {"blindFadeOutTime", sun.blindFadeOutTime                                                         },
+                {"glareMinDot",      sun.glareMinDot                                                              },
+                {"glareMaxDot",      sun.glareMaxDot                                                              },
+                {"glareMaxLighten",  sun.glareMaxLighten                                                          },
+                {"glareFadeInTime",  sun.glareFadeInTime                                                          },
+                {"glareFadeOutTime", sun.glareFadeOutTime                                                         },
+                {"sunFxPosition",    world::Vec3(sun.sunFxPosition)                                               },
+            };
+        }
+
+        [[nodiscard]] static json CreateDpvsStatic(const GfxWorld& gfxWorld)
+        {
+            const auto& dpvs = gfxWorld.dpvs;
+
+            return json{
+                {"smodelCount",               dpvs.smodelCount              },
+                {"staticSurfaceCount",        dpvs.staticSurfaceCount       },
+                {"staticSurfaceCountNoDecal", dpvs.staticSurfaceCountNoDecal},
+                {"litOpaqueSurfsBegin",       dpvs.litOpaqueSurfsBegin      },
+                {"litOpaqueSurfsEnd",         dpvs.litOpaqueSurfsEnd        },
+                {"litTransSurfsBegin",        dpvs.litTransSurfsBegin       },
+                {"litTransSurfsEnd",          dpvs.litTransSurfsEnd         },
+                {"shadowCasterSurfsBegin",    dpvs.shadowCasterSurfsBegin   },
+                {"shadowCasterSurfsEnd",      dpvs.shadowCasterSurfsEnd     },
+                {"emissiveSurfsBegin",        dpvs.emissiveSurfsBegin       },
+                {"emissiveSurfsEnd",          dpvs.emissiveSurfsEnd         },
+                {"smodelVisDataCount",        dpvs.smodelVisDataCount       },
+                {"surfaceVisDataCount",       dpvs.surfaceVisDataCount      },
+                {"sortedSurfIndex",
+                 world::Base64(dpvs.sortedSurfIndex,
+                               (static_cast<size_t>(dpvs.staticSurfaceCount) + dpvs.staticSurfaceCountNoDecal) * sizeof(uint16_t))},
+                {"smodelInsts",
+                 world::Array(dpvs.smodelInsts,
+                              dpvs.smodelCount,
+                              [](const GfxStaticModelInst& inst)
+                              {
+                                  return json{
+                                      {"bounds", Bounds(inst.bounds)},
+                                      {"lightingOrigin", world::Vec3(inst.lightingOrigin)},
+                                  };
+                              })                                            },
+                {"surfaces",
+                 world::Array(dpvs.surfaces,
+                              gfxWorld.surfaceCount,
+                              [](const GfxSurface& surface)
+                              {
+                                  return json{
+                                      {"tris",
+                                       json{
+                                           {"vertexLayerData", surface.tris.vertexLayerData},
+                                           {"firstVertex", surface.tris.firstVertex},
+                                           {"vertexCount", surface.tris.vertexCount},
+                                           {"triCount", surface.tris.triCount},
+                                           {"baseIndex", surface.tris.baseIndex},
+                                       }},
+                                      {"material",
+                                       dumping::ReferencedAssetName(surface.material ? surface.material->info.name : nullptr)},
+                                      {"laf", surface.laf.packed},
+                                  };
+                              })                                            },
+                {"surfacesBounds",
+                 world::Array(dpvs.surfacesBounds,
+                              gfxWorld.surfaceCount,
+                              [](const GfxSurfaceBounds& bounds)
+                              {
+                                  return Bounds(bounds.bounds);
+                              })                                            },
+                {"smodelDrawInsts",
+                 world::Array(dpvs.smodelDrawInsts,
+                              dpvs.smodelCount,
+                              [](const GfxStaticModelDrawInst& inst)
+                              {
+                                  return json{
+                                      {"placement",
+                                       json{
+                                           {"origin", world::Vec3(inst.placement.origin)},
+                                           {"axis",
+                                            json::array({world::Vec3(inst.placement.axis[0]),
+                                                         world::Vec3(inst.placement.axis[1]),
+                                                         world::Vec3(inst.placement.axis[2])})},
+                                           {"scale", inst.placement.scale},
+                                       }},
+                                      {"model", dumping::ReferencedAssetName(inst.model ? inst.model->name : nullptr)},
+                                      {"cullDist", inst.cullDist},
+                                      {"lightingHandle", inst.lightingHandle},
+                                      {"reflectionProbeIndex", static_cast<int>(inst.reflectionProbeIndex)},
+                                      {"primaryLightIndex", static_cast<int>(inst.primaryLightIndex)},
+                                      {"flags", static_cast<int>(inst.flags)},
+                                      {"firstMtlSkinIndex", static_cast<int>(inst.firstMtlSkinIndex)},
+                                      {"groundLighting", inst.groundLighting.packed},
+                                      {"cacheId",
+                                       json::array({inst.cacheId[0], inst.cacheId[1], inst.cacheId[2], inst.cacheId[3]})},
+                                  };
+                              })                                            },
+            };
+        }
+
+        std::ostream& m_stream;
+    };
+} // namespace
+
+namespace world
+{
+    void CLASS_NAME::DumpAsset(AssetDumpingContext& context, const XAssetInfo<AssetGfxWorld::Type>& asset)
+    {
+        const auto assetFile = context.OpenAssetFile(std::format("gfxworld/{}.json", asset.m_name));
+        if (!assetFile)
+            return;
+
+        Dumper(*assetFile).Dump(*asset.Asset());
+    }
+} // namespace world

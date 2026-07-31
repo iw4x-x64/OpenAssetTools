@@ -1,0 +1,24 @@
+#options GAME (IW4, IW4MS)
+
+#filename "Game/" + GAME + "/World/GfxWorldJsonDumper" + GAME + ".h"
+
+#set GAME_HEADER "\"Game/" + GAME + "/" + GAME + ".h\""
+#set CLASS_NAME "GfxWorldJsonDumper" + GAME
+
+// This file was templated.
+// See GfxWorldJsonDumper.h.template.
+// Do not modify, changes will be lost.
+
+#pragma once
+
+#include "Dumping/AbstractAssetDumper.h"
+#include GAME_HEADER
+
+namespace world
+{
+    class CLASS_NAME final : public AbstractAssetDumper<GAME::AssetGfxWorld>
+    {
+    protected:
+        void DumpAsset(AssetDumpingContext& context, const XAssetInfo<GAME::AssetGfxWorld::Type>& asset) override;
+    };
+} // namespace world

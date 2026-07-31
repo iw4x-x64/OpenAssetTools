@@ -1,4 +1,4 @@
-#options GAME(IW4, IW5)
+#options GAME(IW4, IW4MS, IW5)
 
 #filename "Game/" + GAME + "/Vehicle/RawLoaderVehicle" + GAME + ".h"
 

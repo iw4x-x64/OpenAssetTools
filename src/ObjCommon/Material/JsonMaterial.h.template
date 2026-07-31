@@ -1,4 +1,4 @@
-#options GAME (IW3, IW4, IW5, T4, T5, T6)
+#options GAME (IW3, IW4, IW4MS, IW5, T4, T5, T6)
 
 #filename "Game/" + GAME + "/Material/JsonMaterial" + GAME + ".h"
 
@@ -7,6 +7,11 @@
 #define HAS_WATER
 #elif GAME == "IW4"
 #define FEATURE_IW4
+#define HAS_WATER
+#elif GAME == "IW4MS"
+// IW4MS shares the IW4 content model, so it takes the same branches as IW4.
+#define FEATURE_IW4
+#define FEATURE_IW4MS
 #define HAS_WATER
 #elif GAME == "IW5"
 #define FEATURE_IW5
@@ -300,6 +305,10 @@ namespace GAME
         int m;
         int n;
         std::string h0;
+#ifdef FEATURE_IW4MS
+        // This build stores H0 planar, so the second half needs its own field.
+        std::string h0Part1;
+#endif
         std::string wTerm;
         float lx;
         float lz;
@@ -316,6 +325,9 @@ namespace GAME
         m,
         n,
         h0,
+#ifdef FEATURE_IW4MS
+        h0Part1,
+#endif
         wTerm,
         lx,
         lz,

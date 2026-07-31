@@ -19,6 +19,8 @@ namespace T4
 
         static constexpr size_t AUTHED_CHUNK_SIZE = 0x2000;
         static constexpr unsigned OFFSET_BLOCK_BIT_COUNT = 3u;
+        // The block index sits directly above the offset in a 32-bit serialized pointer.
+        static constexpr unsigned OFFSET_BIT_COUNT = 32u - OFFSET_BLOCK_BIT_COUNT;
         static constexpr block_t INSERT_BLOCK = XFILE_BLOCK_VIRTUAL;
     };
 } // namespace T4

@@ -3,6 +3,7 @@
 #include "Game/IW4/AssetLoaderIW4.h"
 #include "Game/IW4/IW4.h"
 #include "Loading/Exception/UnsupportedAssetTypeException.h"
+#include "Zone/Stream/ZoneStreamTrace.h"
 
 #include <cassert>
 
@@ -56,6 +57,10 @@ void ContentLoader::LoadXAsset(const bool atStreamStart) const
 
     if (atStreamStart)
         m_stream.Load<XAsset>(varXAsset);
+
+    // Recorded before the load so that a trace ending mid asset still names the asset that failed.
+    zone_trace::Record(
+        zone_trace::op::ASSET, -1, 0u, 0u, static_cast<std::uint64_t>(varXAsset->type), IGame::GetGameById(GameId::IW4)->GetAssetTypeName(varXAsset->type).value_or("?"));
 
     switch (varXAsset->type)
     {
@@ -130,10 +135,6 @@ void ContentLoader::LoadXAssetArray(const bool atStreamStart, const size_t count
     {
         LoadXAsset(false);
         varXAsset++;
-
-#ifdef DEBUG_OFFSETS
-        m_stream.DebugOffsets(index);
-#endif
     }
 }
 

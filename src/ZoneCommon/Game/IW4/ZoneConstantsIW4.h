@@ -61,6 +61,8 @@ namespace IW4
         static constexpr unsigned AUTHED_CHUNK_COUNT_PER_GROUP = 256;
 
         static constexpr unsigned OFFSET_BLOCK_BIT_COUNT = 4u;
+        // The block index sits directly above the offset in a 32-bit serialized pointer.
+        static constexpr unsigned OFFSET_BIT_COUNT = 32u - OFFSET_BLOCK_BIT_COUNT;
         static constexpr block_t INSERT_BLOCK = XFILE_BLOCK_VIRTUAL;
     };
 } // namespace IW4

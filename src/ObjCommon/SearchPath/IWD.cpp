@@ -227,6 +227,15 @@ namespace
                 unzGetCurrentFileInfo64(m_unz_file, &info, fileNameBuffer, sizeof(fileNameBuffer), nullptr, 0, nullptr, 0);
 
                 std::string fileName(fileNameBuffer);
+
+                // Zip names are supposed to use forward slashes, but plenty of Windows tools write
+                // backslashes and the game reads them anyway. Normalizing on the way in is what makes
+                // such an IWD searchable at all: Open already normalizes the name it looks up, so an
+                // entry stored with backslashes could never be found, and Find would hand its callers
+                // a path they cannot open.
+                //
+                std::ranges::replace(fileName, '\\', '/');
+
                 fs::path path(fileName);
 
                 if (path.has_filename())

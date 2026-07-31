@@ -33,6 +33,21 @@ public:
     [[nodiscard]] virtual WordSize GetWordSize() const = 0;
     virtual void SetWordSize(WordSize wordSize) = 0;
 
+    /**
+     * \brief Word size used when computing the alignment of an allocation, as opposed to the word
+     * size used for the layout itself.
+     *
+     * These are normally the same. They differ when a game's loader was generated for one word size
+     * and then ported to another without recomputing its alignment constants, which is what the
+     * retail Microsoft x64 IW4 build did: its structures are laid out for 8 byte pointers but every
+     * allocation is still aligned as if pointers were 4 bytes. Reproducing that is not optional,
+     * because alignment advances the block cursor without consuming any payload.
+     *
+     * Defaults to the layout word size when never set.
+     */
+    [[nodiscard]] virtual WordSize GetAllocAlignmentWordSize() const = 0;
+    virtual void SetAllocAlignmentWordSize(WordSize wordSize) = 0;
+
     [[nodiscard]] virtual const std::vector<EnumDefinition*>& GetAllEnums() const = 0;
     [[nodiscard]] virtual const std::vector<StructDefinition*>& GetAllStructs() const = 0;
     [[nodiscard]] virtual const std::vector<UnionDefinition*>& GetAllUnions() const = 0;

@@ -6,6 +6,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <string_view>
 #include <type_traits>
 #include <unordered_map>
 #include <vector>
@@ -14,6 +15,7 @@ enum class GameId : std::uint8_t
 {
     IW3,
     IW4,
+    IW4MS, // Microsoft x64 release
     IW5,
     T4,
     T5,
@@ -49,6 +51,7 @@ enum class GamePlatform : std::uint8_t
 static constexpr const char* GameId_Names[]{
     "IW3",
     "IW4",
+    "IW4MS",
     "IW5",
     "T4",
     "T5",
@@ -79,6 +82,13 @@ public:
     [[nodiscard]] virtual std::optional<const char*> GetSubAssetTypeName(asset_type_t subAssetType) const = 0;
 
     static IGame* GetGameById(GameId gameId);
+
+    /**
+     * \brief Resolves a game name as it appears in a zone definition or on the command line.
+     * \param gameName Game name in any casing, e.g. "IW4MS" or "iw4ms".
+     * \return The matching game, or nullopt when the name is not a known game.
+     */
+    static std::optional<GameId> FindGameIdByName(std::string_view gameName);
 };
 
 class AbstractGame : public IGame

@@ -16,6 +16,7 @@
 #include "Parsing/Commands/Sequence/SequenceSetBlock.h"
 #include "Parsing/Commands/Sequence/SequenceString.h"
 #include "Parsing/Commands/Sequence/SequenceUse.h"
+#include "Parsing/Commands/Sequence/SequenceAllocAlignmentWordSize.h"
 #include "Parsing/Commands/Sequence/SequenceWordSize.h"
 
 CommandsParser::CommandsParser(CommandsLexer* lexer, IDataRepository* targetRepository)
@@ -44,6 +45,7 @@ const std::vector<CommandsParser::sequence_t*>& CommandsParser::GetTestsForState
         new SequenceString(),
         new SequenceUse(),
         new SequenceWordSize(),
+        new SequenceAllocAlignmentWordSize(),
     });
 
     return tests;

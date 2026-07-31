@@ -1,0 +1,386 @@
+#options GAME (IW4, IW4MS)
+
+#filename "Game/" + GAME + "/World/ClipMapJsonDumper" + GAME + ".cpp"
+
+#set WRITER_HEADER "\"ClipMapJsonDumper" + GAME + ".h\""
+#set SP_CLASS_NAME "ClipMapSpJsonDumper" + GAME
+#set MP_CLASS_NAME "ClipMapMpJsonDumper" + GAME
+#set GAME_LOWER_NAME "\"iw4\""
+
+// This file was templated.
+// See ClipMapJsonDumper.cpp.template.
+// Do not modify, changes will be lost.
+
+#include WRITER_HEADER
+
+#include "Dumping/AssetDumpingContext.h"
+#include "World/WorldJsonCommon.h"
+
+#include <cstdint>
+#include <iomanip>
+#include <nlohmann/json.hpp>
+
+using namespace nlohmann;
+using namespace GAME;
+
+namespace
+{
+    class Dumper
+    {
+    public:
+        Dumper(std::ostream& stream, const char* typeName)
+            : m_stream(stream),
+              m_type_name(typeName)
+        {
+        }
+
+        void Dump(const clipMap_t& clipMap) const
+        {
+            json jRoot;
+
+            jRoot["_type"] = m_type_name;
+            jRoot["_version"] = 1;
+            jRoot["_game"] = GAME_LOWER_NAME;
+
+            jRoot["isInUse"] = clipMap.isInUse;
+            jRoot["checksum"] = clipMap.checksum;
+            jRoot["mapEnts"] = dumping::ReferencedAssetName(clipMap.mapEnts ? clipMap.mapEnts->name : nullptr);
+
+            jRoot["planes"] = world::Array(clipMap.planes,
+                                           static_cast<size_t>(clipMap.planeCount),
+                                           [](const cplane_s& plane)
+                                           {
+                                               return json{
+                                                   {"normal", world::Vec3(plane.normal)  },
+                                                   {"dist",   plane.dist                 },
+                                                   {"type",   static_cast<int>(plane.type)},
+                                               };
+                                           });
+
+            jRoot["staticModelList"] = world::Array(clipMap.staticModelList,
+                                                    clipMap.numStaticModels,
+                                                    [](const cStaticModel_s& model)
+                                                    {
+                                                        return json{
+                                                            {"xmodel", dumping::ReferencedAssetName(model.xmodel ? model.xmodel->name : nullptr)},
+                                                            {"origin", world::Vec3(model.origin)},
+                                                            {"invScaledAxis",
+                                                             json::array({world::Vec3(model.invScaledAxis[0]),
+                                                                          world::Vec3(model.invScaledAxis[1]),
+                                                                          world::Vec3(model.invScaledAxis[2])})},
+                                                            {"absBounds", Bounds(model.absBounds)},
+                                                        };
+                                                    });
+
+            jRoot["materials"] = world::Array(clipMap.materials,
+                                              clipMap.numMaterials,
+                                              [](const ClipMaterial& material)
+                                              {
+                                                  return json{
+                                                      {"name",         material.name ? material.name : ""},
+                                                      {"surfaceFlags", material.surfaceFlags             },
+                                                      {"contents",     material.contents                 },
+                                                  };
+                                              });
+
+            jRoot["brushsides"] = world::Array(clipMap.brushsides,
+                                               clipMap.numBrushSides,
+                                               [&clipMap](const cbrushside_t& side)
+                                               {
+                                                   return json{
+                                                       {"plane", PlaneIndex(clipMap, side.plane)},
+                                                       {"materialNum", side.materialNum},
+                                                       {"firstAdjacentSideOffset", static_cast<int>(side.firstAdjacentSideOffset)},
+                                                       {"edgeCount", static_cast<int>(side.edgeCount)},
+                                                   };
+                                               });
+
+            jRoot["brushEdges"] = world::Base64(clipMap.brushEdges, clipMap.numBrushEdges);
+
+            jRoot["nodes"] = world::Array(clipMap.nodes,
+                                          clipMap.numNodes,
+                                          [&clipMap](const cNode_t& node)
+                                          {
+                                              return json{
+                                                  {"plane",    PlaneIndex(clipMap, node.plane)                    },
+                                                  {"children", json::array({node.children[0], node.children[1]})},
+                                              };
+                                          });
+
+            jRoot["leafs"] = world::Array(clipMap.leafs,
+                                          clipMap.numLeafs,
+                                          [](const cLeaf_t& leaf)
+                                          {
+                                              return Leaf(leaf);
+                                          });
+
+            jRoot["leafbrushNodes"] = world::Array(clipMap.leafbrushNodes,
+                                                   clipMap.leafbrushNodesCount,
+                                                   [&clipMap](const cLeafBrushNode_s& node)
+                                                   {
+                                                       return LeafBrushNode(clipMap, node);
+                                                   });
+
+            jRoot["leafbrushes"] = world::Array(clipMap.leafbrushes, clipMap.numLeafBrushes);
+            jRoot["leafsurfaces"] = world::Array(clipMap.leafsurfaces, clipMap.numLeafSurfaces);
+
+            jRoot["verts"] = world::Array(clipMap.verts,
+                                          clipMap.vertCount,
+                                          [](const vec3_t& vert)
+                                          {
+                                              return json::array({vert.x, vert.y, vert.z});
+                                          });
+
+            jRoot["triCount"] = clipMap.triCount;
+            jRoot["triIndices"] = world::Base64(clipMap.triIndices, static_cast<size_t>(clipMap.triCount) * 3u * sizeof(uint16_t));
+            jRoot["triEdgeIsWalkable"] =
+                world::Base64(clipMap.triEdgeIsWalkable, static_cast<size_t>((3 * clipMap.triCount + 31) / 32) * 4u);
+
+            jRoot["borders"] = world::Array(clipMap.borders,
+                                            static_cast<size_t>(clipMap.borderCount),
+                                            [](const CollisionBorder& border)
+                                            {
+                                                return json{
+                                                    {"distEq",  world::Vec3(border.distEq)},
+                                                    {"zBase",   border.zBase              },
+                                                    {"zSlope",  border.zSlope             },
+                                                    {"start",   border.start              },
+                                                    {"length",  border.length             },
+                                                };
+                                            });
+
+            jRoot["partitions"] = world::Array(clipMap.partitions,
+                                               static_cast<size_t>(clipMap.partitionCount),
+                                               [&clipMap](const CollisionPartition& partition)
+                                               {
+                                                   json jPartition{
+                                                       {"triCount", static_cast<int>(partition.triCount)},
+                                                       {"borderCount", static_cast<int>(partition.borderCount)},
+                                                       {"firstVertSegment", static_cast<int>(partition.firstVertSegment)},
+                                                       {"firstTri", partition.firstTri},
+                                                   };
+
+                                                   if (partition.borderCount > 0)
+                                                       jPartition["firstBorder"] = IndexInto(partition.borders, clipMap.borders);
+
+                                                   return jPartition;
+                                               });
+
+            jRoot["aabbTrees"] = world::Array(clipMap.aabbTrees,
+                                              static_cast<size_t>(clipMap.aabbTreeCount),
+                                              [](const CollisionAabbTree& tree)
+                                              {
+                                                  json jTree{
+                                                      {"midPoint",      world::Vec3(tree.midPoint)},
+                                                      {"materialIndex", tree.materialIndex        },
+                                                      {"childCount",    tree.childCount           },
+                                                      {"halfSize",      world::Vec3(tree.halfSize)},
+                                                  };
+
+                                                  if (tree.childCount)
+                                                      jTree["firstChildIndex"] = tree.u.firstChildIndex;
+                                                  else
+                                                      jTree["partitionIndex"] = tree.u.partitionIndex;
+
+                                                  return jTree;
+                                              });
+
+            jRoot["cmodels"] = world::Array(clipMap.cmodels,
+                                            clipMap.numSubModels,
+                                            [](const cmodel_t& model)
+                                            {
+                                                return json{
+                                                    {"bounds", Bounds(model.bounds)},
+                                                    {"radius", model.radius        },
+                                                    {"leaf",   Leaf(model.leaf)    },
+                                                };
+                                            });
+
+            jRoot["brushes"] = world::Array(clipMap.brushes,
+                                            clipMap.numBrushes,
+                                            [&clipMap](const cbrush_t& brush)
+                                            {
+                                                return Brush(clipMap, brush);
+                                            });
+
+            jRoot["brushBounds"] = world::Array(clipMap.brushBounds,
+                                                clipMap.numBrushes,
+                                                [](const ::GAME::Bounds& bounds)
+                                                {
+                                                    return Bounds(bounds);
+                                                });
+
+            jRoot["brushContents"] = world::Array(clipMap.brushContents, clipMap.numBrushes);
+
+            jRoot["smodelNodes"] = world::Array(clipMap.smodelNodes,
+                                                clipMap.smodelNodeCount,
+                                                [](const SModelAabbNode& node)
+                                                {
+                                                    return json{
+                                                        {"bounds",     Bounds(node.bounds)},
+                                                        {"firstChild", node.firstChild    },
+                                                        {"childCount", node.childCount    },
+                                                    };
+                                                });
+
+            auto jDynEnts = json::array();
+            for (auto list = 0u; list < 2u; list++)
+            {
+                jDynEnts.emplace_back(world::Array(clipMap.dynEntDefList[list],
+                                                   clipMap.dynEntCount[list],
+                                                   [](const DynEntityDef& def)
+                                                   {
+                                                       return DynEntity(def);
+                                                   }));
+            }
+            jRoot["dynEntDefList"] = std::move(jDynEnts);
+
+            world::WriteIfNonZero(jRoot, "padding", reinterpret_cast<const unsigned char(&)[108]>(clipMap.padding));
+
+            m_stream << std::setw(4) << jRoot << "\n";
+        }
+
+    private:
+        [[nodiscard]] static json Bounds(const ::GAME::Bounds& bounds)
+        {
+            return json{
+                {"midPoint", world::Vec3(bounds.midPoint.v)},
+                {"halfSize", world::Vec3(bounds.halfSize.v)},
+            };
+        }
+
+        [[nodiscard]] static json Leaf(const cLeaf_t& leaf)
+        {
+            return json{
+                {"firstCollAabbIndex", leaf.firstCollAabbIndex},
+                {"collAabbCount",      leaf.collAabbCount     },
+                {"brushContents",      leaf.brushContents     },
+                {"terrainContents",    leaf.terrainContents   },
+                {"bounds",             Bounds(leaf.bounds)    },
+                {"leafBrushNode",      leaf.leafBrushNode     },
+            };
+        }
+
+        template<typename T> [[nodiscard]] static int IndexInto(const T* pointer, const T* arrayBase)
+        {
+            if (!pointer || !arrayBase)
+                return -1;
+
+            const auto distance = static_cast<std::intptr_t>(reinterpret_cast<std::uintptr_t>(pointer))
+                                  - static_cast<std::intptr_t>(reinterpret_cast<std::uintptr_t>(arrayBase));
+
+            if (distance % static_cast<std::intptr_t>(sizeof(T)) != 0)
+                return -1;
+
+            return static_cast<int>(distance / static_cast<std::intptr_t>(sizeof(T)));
+        }
+
+        [[nodiscard]] static int PlaneIndex(const clipMap_t& clipMap, const cplane_s* plane)
+        {
+            return IndexInto(plane, clipMap.planes);
+        }
+
+        [[nodiscard]] static json LeafBrushNode(const clipMap_t& clipMap, const cLeafBrushNode_s& node)
+        {
+            json jNode{
+                {"axis",           static_cast<int>(node.axis)},
+                {"leafBrushCount", node.leafBrushCount        },
+                {"contents",       node.contents              },
+            };
+
+            if (node.leafBrushCount > 0)
+            {
+                const auto index = IndexInto(node.data.leaf.brushes, clipMap.leafbrushes);
+
+                if (index >= 0 && static_cast<unsigned>(index) + node.leafBrushCount <= clipMap.numLeafBrushes)
+                    jNode["firstBrush"] = index;
+                else
+                    jNode["brushes"] = world::Array(node.data.leaf.brushes, static_cast<size_t>(node.leafBrushCount));
+            }
+            else
+            {
+                jNode["dist"] = node.data.children.dist;
+                jNode["range"] = node.data.children.range;
+                jNode["childOffset"] = json::array({node.data.children.childOffset[0], node.data.children.childOffset[1]});
+            }
+
+            return jNode;
+        }
+
+        [[nodiscard]] static json Brush(const clipMap_t& clipMap, const cbrush_t& brush)
+        {
+            json jAxialMaterialNum = json::array();
+            json jFirstAdjacentSideOffsets = json::array();
+            json jEdgeCount = json::array();
+            for (auto i = 0u; i < 2u; i++)
+            {
+                jAxialMaterialNum.emplace_back(
+                    json::array({brush.axialMaterialNum[i][0], brush.axialMaterialNum[i][1], brush.axialMaterialNum[i][2]}));
+                jFirstAdjacentSideOffsets.emplace_back(json::array({static_cast<int>(brush.firstAdjacentSideOffsets[i][0]),
+                                                                    static_cast<int>(brush.firstAdjacentSideOffsets[i][1]),
+                                                                    static_cast<int>(brush.firstAdjacentSideOffsets[i][2])}));
+                jEdgeCount.emplace_back(json::array(
+                    {static_cast<int>(brush.edgeCount[i][0]), static_cast<int>(brush.edgeCount[i][1]), static_cast<int>(brush.edgeCount[i][2])}));
+            }
+
+            return json{
+                {"numsides",                  brush.numsides                                     },
+                {"glassPieceIndex",           brush.glassPieceIndex                              },
+                {"firstSide",                 IndexInto(brush.sides, clipMap.brushsides)         },
+                {"baseAdjacentSide",          IndexInto(brush.baseAdjacentSide, clipMap.brushEdges)},
+                {"axialMaterialNum",          std::move(jAxialMaterialNum)                       },
+                {"firstAdjacentSideOffsets",  std::move(jFirstAdjacentSideOffsets)               },
+                {"edgeCount",                 std::move(jEdgeCount)                              },
+            };
+        }
+
+        [[nodiscard]] static json DynEntity(const DynEntityDef& def)
+        {
+            return json{
+                {"type", static_cast<int>(def.type)},
+                {"pose",
+                 json{
+                     {"quat", world::Vec4(def.pose.quat)},
+                     {"origin", world::Vec3(def.pose.origin)},
+                 }                                                                                          },
+                {"xModel",            dumping::ReferencedAssetName(def.xModel ? def.xModel->name : nullptr)  },
+                {"brushModel",        def.brushModel                                                        },
+                {"physicsBrushModel", def.physicsBrushModel                                                 },
+                {"destroyFx",         dumping::ReferencedAssetName(def.destroyFx ? def.destroyFx->name : nullptr)},
+                {"physPreset",        dumping::ReferencedAssetName(def.physPreset ? def.physPreset->name : nullptr)},
+                {"health",            def.health                                                            },
+                {"mass",
+                 json{
+                     {"centerOfMass", world::Vec3(def.mass.centerOfMass)},
+                     {"momentsOfInertia", world::Vec3(def.mass.momentsOfInertia)},
+                     {"productsOfInertia", world::Vec3(def.mass.productsOfInertia)},
+                 }                                                                                          },
+                {"contents",          def.contents                                                          },
+            };
+        }
+
+        std::ostream& m_stream;
+        const char* m_type_name;
+    };
+} // namespace
+
+namespace world
+{
+    void SP_CLASS_NAME::DumpAsset(AssetDumpingContext& context, const XAssetInfo<AssetClipMapSp::Type>& asset)
+    {
+        const auto assetFile = context.OpenAssetFile(std::format("clipmap_sp/{}.json", asset.m_name));
+        if (!assetFile)
+            return;
+
+        Dumper(*assetFile, "clipmap_sp").Dump(*asset.Asset());
+    }
+
+    void MP_CLASS_NAME::DumpAsset(AssetDumpingContext& context, const XAssetInfo<AssetClipMapMp::Type>& asset)
+    {
+        const auto assetFile = context.OpenAssetFile(std::format("clipmap_mp/{}.json", asset.m_name));
+        if (!assetFile)
+            return;
+
+        Dumper(*assetFile, "clipmap_mp").Dump(*asset.Asset());
+    }
+} // namespace world

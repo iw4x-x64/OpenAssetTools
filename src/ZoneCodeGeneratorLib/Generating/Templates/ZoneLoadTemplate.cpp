@@ -888,7 +888,7 @@ namespace
 
         void PrintLoadPtrArrayMethod_Loading(const DataDefinition* def, const StructureInformation* info) const
         {
-            const auto alignment = info && def == info->m_definition ? MakeAllocAlignment(*info) : std::to_string(def->GetAlignment());
+            const auto alignment = info && def == info->m_definition ? MakeAllocAlignment(*info) : std::to_string(def->GetAllocAlignment());
             if (info && !info->m_has_matching_cross_platform_structure && StructureComputations(info).GetDynamicMember())
             {
                 assert(def == info->m_definition);
@@ -1460,7 +1460,7 @@ namespace
                 }
                 else
                 {
-                    LINEF("m_stream.Alloc({0});", modifier.GetAlignment())
+                    LINEF("m_stream.Alloc({0});", modifier.GetAllocAlignment())
                 }
 
                 LINEF("const auto allocSize = LoadDynamicFill_{0}(m_stream.LoadWithFill(0));", MakeSafeTypeName(member->m_type->m_definition))
@@ -1491,7 +1491,7 @@ namespace
                 }
                 else
                 {
-                    LINE_MIDDLEF("{0}", modifier.GetAlignment())
+                    LINE_MIDDLEF("{0}", modifier.GetAllocAlignment())
                 }
 
                 if (allocOutOfBlock && modifier.IsArrayPointer())

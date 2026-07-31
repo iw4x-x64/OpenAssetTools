@@ -17,6 +17,7 @@ public:
     DefinitionWithMembers(std::string _namespace, std::string name, unsigned pack);
 
     [[nodiscard]] unsigned GetAlignment() const override;
+    [[nodiscard]] unsigned GetAllocAlignment() const override;
     [[nodiscard]] bool GetForceAlignment() const override;
     [[nodiscard]] unsigned GetSize() const override;
     [[nodiscard]] bool IsAnonymous() const;
@@ -24,6 +25,8 @@ public:
     unsigned m_flags;
     unsigned m_size;
     unsigned m_alignment;
+    /** Zero means allocations use m_alignment. */
+    unsigned m_alloc_alignment;
     unsigned m_pack;
 
     std::vector<std::shared_ptr<Variable>> m_members;

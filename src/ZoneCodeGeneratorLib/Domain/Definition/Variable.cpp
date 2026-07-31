@@ -17,6 +17,14 @@ unsigned Variable::GetAlignment() const
     return m_type_declaration->GetAlignment();
 }
 
+unsigned Variable::GetAllocAlignment() const
+{
+    if (m_has_alignment_override)
+        return m_alignment_override;
+
+    return m_type_declaration->GetAllocAlignment();
+}
+
 bool Variable::GetForceAlignment() const
 {
     return m_has_alignment_override || m_type_declaration->GetForceAlignment();

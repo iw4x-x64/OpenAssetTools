@@ -34,6 +34,8 @@ namespace T6
         static constexpr unsigned XCHUNK_MAX_WRITE_SIZE = XCHUNK_SIZE - 0x40;
         static constexpr unsigned VANILLA_BUFFER_SIZE = 0x80000;
         static constexpr unsigned OFFSET_BLOCK_BIT_COUNT = 3u;
+        // The block index sits directly above the offset in a 32-bit serialized pointer.
+        static constexpr unsigned OFFSET_BIT_COUNT = 32u - OFFSET_BLOCK_BIT_COUNT;
         static constexpr block_t INSERT_BLOCK = XFILE_BLOCK_VIRTUAL;
 
         static constexpr size_t FILE_SUFFIX_ZERO_MIN_SIZE = 0x40;

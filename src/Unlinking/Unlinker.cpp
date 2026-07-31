@@ -1,5 +1,8 @@
 #include "Unlinker.h"
 
+#include "ZoneRetargeter.h"
+#include "ZoneWriting.h"
+
 #include "ContentLister/ContentPrinter.h"
 #include "Game/AutoSearchPaths.h"
 #include "IObjLoader.h"
@@ -11,6 +14,7 @@
 #include "Utils/Logging/Log.h"
 #include "Zone/Definition/ZoneDefWriter.h"
 #include "Zone/LoadedZoneInformation.h"
+#include "Zone/Stream/ZoneStreamTrace.h"
 #include "ZoneLoading.h"
 
 #include <filesystem>
@@ -98,6 +102,27 @@ namespace
 
         bool Start() override
         {
+            std::unique_ptr<zone_trace::ISink> streamTrace;
+            if (m_args.m_stream_trace_file)
+            {
+                streamTrace = zone_trace::CreateFileSink(*m_args.m_stream_trace_file);
+                if (!streamTrace)
+                {
+                    con::error("Could not open stream trace file \"{}\".", *m_args.m_stream_trace_file);
+                    return false;
+                }
+
+                zone_trace::SetSink(streamTrace.get());
+            }
+
+            struct TraceSinkScope
+            {
+                ~TraceSinkScope()
+                {
+                    zone_trace::SetSink(nullptr);
+                }
+            } clearTraceOnExit;
+
             SharedSearchPaths paths;
             for (const auto& userPath : m_args.m_user_search_paths)
                 paths.RefSearchPath(userPath);
@@ -284,7 +309,7 @@ namespace
 
                 auto absoluteZoneDirectory = absolute(std::filesystem::path(zonePath).remove_filename()).string();
 
-                auto maybeZone = ZoneLoading::LoadZone(zonePath, std::nullopt);
+                auto maybeZone = ZoneLoading::LoadZone(zonePath, std::nullopt, m_args.m_forced_game);
                 if (!maybeZone)
                 {
                     con::error("Failed to load zone \"{}\": {}", zonePath, maybeZone.error());
@@ -336,6 +361,34 @@ namespace
             m_loaded_zones.clear();
         }
 
+        bool ConvertZone(const Zone& zone, const GameId targetGame) const
+        {
+            auto retargeted = retarget::Retarget(zone, targetGame);
+            if (!retargeted)
+                return false;
+
+            const auto outputFolder = m_args.GetOutputFolderPathForZone(zone);
+            fs::create_directories(outputFolder);
+
+            const auto outputPath = fs::path(outputFolder) / std::format("{}.ff", zone.m_name);
+
+            std::ofstream outStream(outputPath, std::ios::out | std::ios::binary);
+            if (!outStream.is_open())
+            {
+                con::error("Could not open \"{}\" for writing.", outputPath.string());
+                return false;
+            }
+
+            if (!ZoneWriting::WriteZone(outStream, *retargeted))
+            {
+                con::error("Failed to write \"{}\".", outputPath.string());
+                return false;
+            }
+
+            con::info("Wrote \"{}\" as {}", outputPath.string(), GameId_Names[static_cast<unsigned>(targetGame)]);
+            return true;
+        }
+
         bool UnlinkZones(SharedSearchPaths& paths) const
         {
             ReferencedSearchPaths previousSearchPaths;
@@ -353,7 +406,7 @@ namespace
                     zoneDirectory = fs::current_path();
                 auto absoluteZoneDirectory = absolute(zoneDirectory).string();
 
-                auto maybeZone = ZoneLoading::LoadZone(zonePath, std::nullopt);
+                auto maybeZone = ZoneLoading::LoadZone(zonePath, std::nullopt, m_args.m_forced_game);
                 if (!maybeZone)
                 {
                     con::error("Failed to load zone \"{}\": {}", zonePath, maybeZone.error());
@@ -363,6 +416,15 @@ namespace
                 auto zone = std::move(*maybeZone);
 
                 LogLoadedZone(*zone);
+
+                if (m_args.m_convert_to_game)
+                {
+                    if (!ConvertZone(*zone, *m_args.m_convert_to_game))
+                        return false;
+
+                    con::info("Unloaded zone \"{}\"", zone->m_name);
+                    continue;
+                }
 
                 auto searchPathsForZone = GetSearchPathsForZone(absoluteZoneDirectory, zone->m_game_id);
                 for (const auto& searchPath : searchPathsForZone)

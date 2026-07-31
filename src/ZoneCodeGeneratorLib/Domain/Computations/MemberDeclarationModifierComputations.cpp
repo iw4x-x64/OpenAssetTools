@@ -263,6 +263,19 @@ bool DeclarationModifierComputations::HasPointerModifier() const
                                });
 }
 
+unsigned DeclarationModifierComputations::GetAllocAlignment() const
+{
+    const auto following = GetFollowingDeclarationModifiers();
+
+    return std::ranges::any_of(following,
+                               [](const DeclarationModifier* modifier)
+                               {
+                                   return modifier->GetType() == DeclarationModifierType::POINTER;
+                               })
+               ? m_information->m_member->GetAllocAlignment()
+               : m_information->m_member->m_type_declaration->m_type->GetAllocAlignment();
+}
+
 unsigned DeclarationModifierComputations::GetAlignment() const
 {
     const auto following = GetFollowingDeclarationModifiers();

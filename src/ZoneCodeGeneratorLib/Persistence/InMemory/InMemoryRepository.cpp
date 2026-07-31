@@ -1,7 +1,8 @@
 #include "InMemoryRepository.h"
 
 InMemoryRepository::InMemoryRepository()
-    : m_word_size(WordSize::UNKNOWN)
+    : m_word_size(WordSize::UNKNOWN),
+      m_alloc_alignment_word_size(WordSize::UNKNOWN)
 {
 }
 
@@ -91,6 +92,17 @@ WordSize InMemoryRepository::GetWordSize() const
 void InMemoryRepository::SetWordSize(const WordSize wordSize)
 {
     m_word_size = wordSize;
+}
+
+WordSize InMemoryRepository::GetAllocAlignmentWordSize() const
+{
+    // Unset means allocations align the same way the layout does, which is the normal case.
+    return m_alloc_alignment_word_size != WordSize::UNKNOWN ? m_alloc_alignment_word_size : m_word_size;
+}
+
+void InMemoryRepository::SetAllocAlignmentWordSize(const WordSize wordSize)
+{
+    m_alloc_alignment_word_size = wordSize;
 }
 
 const std::vector<EnumDefinition*>& InMemoryRepository::GetAllEnums() const

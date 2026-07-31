@@ -1,0 +1,24 @@
+#options GAME (IW4, IW4MS)
+
+#filename "Game/" + GAME + "/FX/ImpactFxJsonDumper" + GAME + ".h"
+
+#set GAME_HEADER "\"Game/" + GAME + "/" + GAME + ".h\""
+#set CLASS_NAME "ImpactFxJsonDumper" + GAME
+
+// This file was templated.
+// See ImpactFxJsonDumper.h.template.
+// Do not modify, changes will be lost.
+
+#pragma once
+
+#include "Dumping/AbstractAssetDumper.h"
+#include GAME_HEADER
+
+namespace fx
+{
+    class CLASS_NAME final : public AbstractAssetDumper<GAME::AssetImpactFx>
+    {
+    protected:
+        void DumpAsset(AssetDumpingContext& context, const XAssetInfo<GAME::AssetImpactFx::Type>& asset) override;
+    };
+} // namespace fx

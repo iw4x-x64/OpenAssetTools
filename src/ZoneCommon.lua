@@ -50,6 +50,11 @@ function ZoneCommon:project()
 			path.join(folder, "ZoneCommon/**.cpp"),
 			ZoneCode:allMarkFiles()
 		}
+
+		-- IW4MS serializes 64 bit pointers, so its generated code is x64 only. See ZoneCode.Assets64.
+		filter "platforms:x64"
+			files { ZoneCode:allMarkFiles64() }
+		filter {}
 		
         vpaths {
 			["*"] = {

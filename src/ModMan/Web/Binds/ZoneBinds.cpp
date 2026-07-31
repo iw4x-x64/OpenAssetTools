@@ -9,6 +9,7 @@ NLOHMANN_JSON_SERIALIZE_ENUM(GameId,
                              {
                                  {GameId::IW3, "iw3"},
                                  {GameId::IW4, "iw4"},
+                                 {GameId::IW4MS, "iw4ms"},
                                  {GameId::IW5, "iw5"},
                                  {GameId::T4,  "t4" },
                                  {GameId::T5,  "t5" },

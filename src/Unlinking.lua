@@ -15,6 +15,7 @@ function Unlinking:link(links)
 	links:linkto(ZoneLoading)
 	links:linkto(ObjLoading)
 	links:linkto(ObjWriting)
+	links:linkto(ZoneWriting)
 end
 
 function Unlinking:use()
@@ -54,4 +55,5 @@ function Unlinking:project()
         ZoneLoading:include(includes)
         ObjLoading:include(includes)
         ObjWriting:include(includes)
+        ZoneWriting:include(includes)
 end

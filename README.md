@@ -13,6 +13,7 @@ It currently offers support for the PC versions of:
 
 - [IW3 (COD4: Modern Warfare - 2007)](https://en.wikipedia.org/wiki/Call_of_Duty_4:_Modern_Warfare)
 - [IW4 (Modern Warfare 2 - 2009)](https://en.wikipedia.org/wiki/Call_of_Duty:_Modern_Warfare_2)
+- [IW4MS (Modern Warfare 2 - Microsoft x64 release)](https://www.xbox.com/en-CA/games/store/call-of-duty-modern-warfare-2-2009/9P31HFP7L9WT/0010)
 - [IW5 (Modern Warfare 3 - 2011)](https://en.wikipedia.org/wiki/Call_of_Duty:_Modern_Warfare_3)
 - [T4 (World at War - 2008)](https://en.wikipedia.org/wiki/Call_of_Duty:_World_at_War)
 - [T5 (Black Ops - 2010)](https://en.wikipedia.org/wiki/Call_of_Duty:_Black_Ops)

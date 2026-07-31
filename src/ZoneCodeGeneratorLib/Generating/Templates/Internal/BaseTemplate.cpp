@@ -261,7 +261,7 @@ std::string BaseTemplate::MakeAllocAlignment(const StructureInformation& info)
     if (info.m_alloc_alignment)
         return MakeEvaluation(info.m_alloc_alignment.get());
 
-    return std::to_string(info.m_definition->GetAlignment());
+    return std::to_string(info.m_definition->GetAllocAlignment());
 }
 
 std::string BaseTemplate::MakeEvaluation(const IEvaluation* evaluation)

@@ -45,6 +45,11 @@ function ZoneLoading:project()
 			path.join(folder, "ZoneLoading/**.cpp"),
 			ZoneCode:allLoadFiles()
 		}
+
+		-- IW4MS serializes 64 bit pointers, so its generated code is x64 only. See ZoneCode.Assets64.
+		filter "platforms:x64"
+			files { ZoneCode:allLoadFiles64() }
+		filter {}
 		
         vpaths {
 			["*"] = {

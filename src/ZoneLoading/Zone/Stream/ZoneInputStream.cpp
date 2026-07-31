@@ -6,6 +6,7 @@
 #include "Loading/Exception/OutOfBlockBoundsException.h"
 #include "Utils/Alignment.h"
 #include "Utils/Logging/Log.h"
+#include "Zone/Stream/ZoneStreamTrace.h"
 
 #include <cassert>
 #include <cstring>
@@ -47,6 +48,7 @@ namespace
     public:
         XBlockInputStream(const unsigned pointerBitCount,
                           const unsigned blockBitCount,
+                          const unsigned offsetBitCount,
                           std::vector<XBlock*>& blocks,
                           const block_t insertBlock,
                           ILoadingStream& stream,
@@ -57,9 +59,9 @@ namespace
               m_stream(stream),
               m_memory(memory),
               m_pointer_byte_count(pointerBitCount / 8u),
-              m_block_mask((std::numeric_limits<uintptr_t>::max() >> (sizeof(uintptr_t) * 8 - blockBitCount)) << (pointerBitCount - blockBitCount)),
-              m_block_shift(pointerBitCount - blockBitCount),
-              m_offset_mask(std::numeric_limits<uintptr_t>::max() >> (sizeof(uintptr_t) * 8 - (pointerBitCount - blockBitCount))),
+              m_block_mask((std::numeric_limits<uintptr_t>::max() >> (sizeof(uintptr_t) * 8 - blockBitCount)) << offsetBitCount),
+              m_block_shift(offsetBitCount),
+              m_offset_mask(std::numeric_limits<uintptr_t>::max() >> (sizeof(uintptr_t) * 8 - offsetBitCount)),
               m_last_fill_size(0),
               m_has_progress_callback(false),
               m_progress_current_size(0uz),
@@ -67,6 +69,9 @@ namespace
         {
             assert(pointerBitCount % 8u == 0u);
             assert(insertBlock < static_cast<block_t>(blocks.size()));
+
+            assert(blockBitCount + offsetBitCount <= pointerBitCount);
+            assert((1uLL << blockBitCount) >= blocks.size());
 
             std::memset(m_block_offsets.data(), 0, sizeof(decltype(m_block_offsets)::value_type) * m_block_offsets.size());
 
@@ -96,6 +101,8 @@ namespace
 
             if (newBlock->m_type == XBlockType::BLOCK_TYPE_TEMP)
                 m_temp_offsets.push(m_block_offsets[newBlock->m_index]);
+
+            zone_trace::Record(zone_trace::op::PUSH, block, m_block_offsets[newBlock->m_index], m_block_offsets[newBlock->m_index]);
         }
 
         block_t PopBlock() override
@@ -109,12 +116,17 @@ namespace
 
             m_block_stack.pop();
 
+            const auto offsetBefore = m_block_offsets[poppedBlock->m_index];
+
             // If the temp block is not used anymore right now, reset it to the buffer start since as the name suggests, the data inside is temporary.
             if (poppedBlock->m_type == XBlockType::BLOCK_TYPE_TEMP)
             {
                 m_block_offsets[poppedBlock->m_index] = m_temp_offsets.top();
                 m_temp_offsets.pop();
             }
+
+            zone_trace::Record(
+                zone_trace::op::POP, poppedBlock->m_index, offsetBefore, m_block_offsets[poppedBlock->m_index]);
 
             return poppedBlock->m_index;
         }
@@ -311,6 +323,18 @@ namespace
             // So all offsets are moved by 1.
             const auto offsetInt = reinterpret_cast<uintptr_t>(offset) - 1u;
 
+            // Recorded before any validation so that a trace which ends on a rejected pointer still
+            // shows the value that was rejected. The raw serialized value is recorded rather than
+            // the resolved address, so two runs of the same zone produce identical traces regardless
+            // of where the blocks happened to be allocated.
+            zone_trace::Record(zone_trace::op::POINTER,
+                               static_cast<int>((offsetInt & m_block_mask) >> m_block_shift),
+                               static_cast<size_t>(offsetInt & m_offset_mask),
+                               static_cast<size_t>(offsetInt & m_offset_mask),
+                               static_cast<std::uint64_t>(reinterpret_cast<uintptr_t>(offset)));
+
+            ValidateZonePointerBits(offsetInt);
+
             const auto blockNum = static_cast<block_t>((offsetInt & m_block_mask) >> m_block_shift);
             const auto blockOffset = static_cast<size_t>(offsetInt & m_offset_mask);
 
@@ -329,6 +353,8 @@ namespace
         {
             // For details see ConvertOffsetToPointer
             const auto offsetInt = reinterpret_cast<uintptr_t>(offset) - 1u;
+
+            ValidateZonePointerBits(offsetInt);
 
             const auto blockNum = static_cast<block_t>((offsetInt & m_block_mask) >> m_block_shift);
             const auto blockOffset = static_cast<size_t>(offsetInt & m_offset_mask);
@@ -365,6 +391,8 @@ namespace
             // For details see ConvertOffsetToPointer
             const auto offsetInt = reinterpret_cast<uintptr_t>(offset) - 1u;
 
+            ValidateZonePointerBits(offsetInt);
+
             const auto blockNum = static_cast<block_t>((offsetInt & m_block_mask) >> m_block_shift);
             const auto blockOffset = static_cast<size_t>(offsetInt & m_offset_mask);
 
@@ -387,6 +415,8 @@ namespace
         {
             // For details see ConvertOffsetToPointer
             const auto offsetInt = reinterpret_cast<uintptr_t>(offset) - 1u;
+
+            ValidateZonePointerBits(offsetInt);
 
             const auto blockNum = static_cast<block_t>((offsetInt & m_block_mask) >> m_block_shift);
             const auto blockOffset = static_cast<size_t>(offsetInt & m_offset_mask);
@@ -411,27 +441,52 @@ namespace
             throw InvalidOffsetBlockOffsetException(block, blockOffset);
         }
 
-#ifdef DEBUG_OFFSETS
-        void DebugOffsets(const size_t assetIndex) const override
+        bool ReportBlockUsage() const override
         {
-            std::ostringstream ss;
+            // The zone header states exactly how much memory each block needs. A correct traversal
+            // consumes precisely that much: every read, every alignment and every runtime reserve
+            // lands the cursor on the stated size.
+            //
+            // That makes this the sharpest available check on a loader. A missed alignment or a
+            // wrong array count shows up here as a block that ends a few bytes off, whereas the same
+            // mistake would otherwise surface much later as a garbled asset name with no obvious
+            // cause. It is worth reporting for every game, not just while bringing a new one up.
+            auto allMatch = true;
 
-            ss << "Asset " << assetIndex;
             for (const auto& block : m_blocks)
             {
-                if (block->m_type != XBlockType::BLOCK_TYPE_NORMAL)
+                const auto used = m_block_offsets[block->m_index];
+                const auto expected = block->m_buffer_size;
+
+                if (used == expected)
+                {
+                    con::debug("block {} ({}) want=0x{:x} have=0x{:x}", block->m_index, block->m_name, expected, used);
+                    continue;
+                }
+
+                // The temp block is scratch space that is pushed and popped, so its cursor is
+                // rewound rather than consumed and it never matches the allocated size.
+                if (block->m_type == XBlockType::BLOCK_TYPE_TEMP)
                     continue;
 
-                ss << " " << m_block_offsets[block->m_index];
+                allMatch = false;
+                con::warn("block {} ({}) want=0x{:x} have=0x{:x} (off by {})",
+                          block->m_index,
+                          block->m_name,
+                          expected,
+                          used,
+                          static_cast<int64_t>(used) - static_cast<int64_t>(expected));
             }
 
-            con::debug(ss.str());
+            return allMatch;
         }
-#endif
 
     private:
         void LoadDataFromBlock(const XBlock& block, void* dst, const size_t size)
         {
+            const auto offsetBefore = m_block_offsets[block.m_index];
+            const auto* operation = zone_trace::op::READ;
+
             switch (block.m_type)
             {
             case XBlockType::BLOCK_TYPE_TEMP:
@@ -441,6 +496,7 @@ namespace
 
             case XBlockType::BLOCK_TYPE_RUNTIME:
                 std::memset(dst, 0, size);
+                operation = zone_trace::op::MEMSET;
                 break;
 
             case XBlockType::BLOCK_TYPE_DELAY:
@@ -449,6 +505,8 @@ namespace
             }
 
             IncBlockPos(block, size);
+
+            zone_trace::Record(operation, block.m_index, offsetBefore, m_block_offsets[block.m_index], size);
         }
 
         void IncBlockPos(const XBlock& block, const size_t size)
@@ -463,12 +521,33 @@ namespace
             }
         }
 
+        /**
+         * \brief Rejects serialized pointers carrying bits outside the block/offset encoding.
+         *
+         * The two fields need not fill the pointer. IW4MS packs a 4 bit block index and a 28 bit
+         * offset into the low half of a 64 bit field, so anything set above that is not part of the
+         * encoding and the value is not a zone pointer at all. Without this the masks would quietly
+         * discard those bits and produce a plausible looking address into unrelated block memory,
+         * turning a detectable format error into corrupt data much further along.
+         */
+        void ValidateZonePointerBits(const uintptr_t offsetInt) const
+        {
+            if ((offsetInt & ~(m_block_mask | m_offset_mask)) != 0u)
+                throw InvalidOffsetBlockException(static_cast<block_t>(offsetInt >> m_block_shift));
+        }
+
         void Align(const XBlock& block, const unsigned align)
         {
             if (align > 0)
             {
                 const auto blockIndex = block.m_index;
-                m_block_offsets[blockIndex] = utils::Align(m_block_offsets[blockIndex], static_cast<size_t>(align));
+                const auto offsetBefore = m_block_offsets[blockIndex];
+                m_block_offsets[blockIndex] = utils::Align(offsetBefore, static_cast<size_t>(align));
+
+                // Alignment moves the block cursor without consuming any stream bytes, so a wrong
+                // alignment shows up as a block using more memory than the zone header allocated
+                // rather than as a failed read. Tracing it is what makes that diagnosable.
+                zone_trace::Record(zone_trace::op::ALIGN, blockIndex, offsetBefore, m_block_offsets[blockIndex], align);
             }
         }
 
@@ -516,11 +595,13 @@ namespace
 
 std::unique_ptr<ZoneInputStream> ZoneInputStream::Create(const unsigned pointerBitCount,
                                                          const unsigned blockBitCount,
+                                                         const unsigned offsetBitCount,
                                                          std::vector<XBlock*>& blocks,
                                                          const block_t insertBlock,
                                                          ILoadingStream& stream,
                                                          MemoryManager& memory,
                                                          std::optional<std::unique_ptr<ProgressCallback>> progressCallback)
 {
-    return std::make_unique<XBlockInputStream>(pointerBitCount, blockBitCount, blocks, insertBlock, stream, memory, std::move(progressCallback));
+    return std::make_unique<XBlockInputStream>(
+        pointerBitCount, blockBitCount, offsetBitCount, blocks, insertBlock, stream, memory, std::move(progressCallback));
 }

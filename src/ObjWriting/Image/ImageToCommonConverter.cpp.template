@@ -1,4 +1,4 @@
-#options GAME (IW3, IW4, IW5, T4, T5, T6)
+#options GAME (IW3, IW4, IW4MS, IW5, T4, T5, T6)
 
 #filename "Game/" + GAME + "/Image/ImageToCommonConverter" + GAME + ".cpp"
 
@@ -10,6 +10,13 @@
 #define IWI6
 #elif GAME == "IW4"
 #define FEATURE_IW4
+#define DX9
+#define IWI8
+#elif GAME == "IW4MS"
+// IW4MS shares the IW4 content model, so it opts into every FEATURE_IW4 behaviour branch below.
+// FEATURE_IW4MS exists so a future x64-only divergence can be expressed without disturbing IW4.
+#define FEATURE_IW4
+#define FEATURE_IW4MS
 #define DX9
 #define IWI8
 #elif GAME == "IW5"

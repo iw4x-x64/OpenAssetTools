@@ -79,6 +79,11 @@ void CommandsParserState::SetWordSize(const WordSize wordSize) const
     m_repository->SetWordSize(wordSize);
 }
 
+void CommandsParserState::SetAllocAlignmentWordSize(const WordSize wordSize) const
+{
+    m_repository->SetAllocAlignmentWordSize(wordSize);
+}
+
 void CommandsParserState::SetGame(std::string gameName) const
 {
     m_repository->SetGame(std::move(gameName));

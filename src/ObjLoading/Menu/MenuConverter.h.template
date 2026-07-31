@@ -1,12 +1,21 @@
+#options GAME (IW4, IW4MS)
+
+#filename "Game/" + GAME + "/Menu/MenuConverter" + GAME + ".h"
+
+// This file was templated.
+// See MenuConverter.h.template.
+// Do not modify, changes will be lost.
+
 #pragma once
 
 #include "Asset/AssetCreationContext.h"
-#include "Game/IW4/IW4.h"
+#set GAME_HEADER "\"Game/" + GAME + "/" + GAME + ".h\""
+#include GAME_HEADER
 #include "Parsing/Menu/Domain/CommonMenuDef.h"
 #include "SearchPath/ISearchPath.h"
 #include "Utils/MemoryManager.h"
 
-namespace IW4
+namespace GAME
 {
     class IMenuConverter
     {
@@ -18,4 +27,4 @@ namespace IW4
 
         static std::unique_ptr<IMenuConverter> Create(bool disableOptimizations, ISearchPath& searchPath, MemoryManager& memory, AssetCreationContext& context);
     };
-} // namespace IW4
+} // namespace GAME

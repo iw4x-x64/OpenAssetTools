@@ -135,6 +135,7 @@ include "src/Linking.lua"
 include "src/ModMan.lua"
 include "src/Parser.lua"
 include "src/RawTemplater.lua"
+include "src/SourceTemplates.lua"
 include "src/UnlinkerCli.lua"
 include "src/Unlinking.lua"
 include "src/Utils.lua"
@@ -160,6 +161,7 @@ group "Components"
     Parser:project()
     Utils:project()
     XMemCompress:project()
+    SourceTemplates:project()
     ZoneCode:project()
     ZoneCodeGeneratorLib:project()
     ZoneCommon:project()
@@ -210,6 +212,7 @@ include "test/ParserTests.lua"
 include "test/SystemTests.lua"
 include "test/ZoneCodeGeneratorLibTests.lua"
 include "test/ZoneCommonTests.lua"
+include "test/ZoneLoadingTests.lua"
 
 -- Tests group: Unit test and other tests projects
 group "Tests"
@@ -225,4 +228,5 @@ group "Tests"
     SystemTests:project()
     ZoneCodeGeneratorLibTests:project()
     ZoneCommonTests:project()
+    ZoneLoadingTests:project()
 group ""

@@ -11,7 +11,8 @@ TypeDeclaration::TypeDeclaration(const DataDefinition* type)
       m_custom_bit_size(0),
       m_flags(0),
       m_size(0),
-      m_alignment(0)
+      m_alignment(0),
+      m_alloc_alignment(0)
 {
     assert(m_type != nullptr);
 }
@@ -26,6 +27,12 @@ unsigned TypeDeclaration::GetAlignment() const
 {
     assert(m_flags & FLAG_FIELDS_CALCULATED);
     return m_alignment;
+}
+
+unsigned TypeDeclaration::GetAllocAlignment() const
+{
+    assert(m_flags & FLAG_FIELDS_CALCULATED);
+    return m_alloc_alignment != 0 ? m_alloc_alignment : m_alignment;
 }
 
 bool TypeDeclaration::GetForceAlignment() const

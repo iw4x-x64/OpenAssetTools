@@ -1,0 +1,297 @@
+#options GAME (IW4, IW4MS)
+
+#filename "Game/" + GAME + "/World/GameWorldJsonDumper" + GAME + ".cpp"
+
+#set WRITER_HEADER "\"GameWorldJsonDumper" + GAME + ".h\""
+#set SP_CLASS_NAME "GameWorldSpJsonDumper" + GAME
+#set MP_CLASS_NAME "GameWorldMpJsonDumper" + GAME
+#set GAME_LOWER_NAME "\"iw4\""
+
+// This file was templated.
+// See GameWorldJsonDumper.cpp.template.
+// Do not modify, changes will be lost.
+
+#include WRITER_HEADER
+
+#include "Dumping/AssetDumpingContext.h"
+#include "World/WorldJsonCommon.h"
+#include "Zone/Zone.h"
+
+#include <cassert>
+#include <iomanip>
+#include <nlohmann/json.hpp>
+
+using namespace nlohmann;
+using namespace GAME;
+
+namespace
+{
+    [[nodiscard]] json CreateGlassData(const G_GlassData& glass)
+    {
+        json jGlass{
+            {"damageToWeaken",  glass.damageToWeaken },
+            {"damageToDestroy", glass.damageToDestroy},
+        };
+
+        jGlass["glassPieces"] = world::Array(glass.glassPieces,
+                                             glass.pieceCount,
+                                             [](const G_GlassPiece& piece)
+        {
+            return json{
+                {"damageTaken",         piece.damageTaken                },
+                {"collapseTime",        piece.collapseTime               },
+                {"lastStateChangeTime", piece.lastStateChangeTime        },
+                {"impactDir",           static_cast<int>(piece.impactDir)},
+                {"impactPos",           json::array({static_cast<int>(piece.impactPos[0]), static_cast<int>(piece.impactPos[1])})},
+            };
+        });
+
+        jGlass["glassNames"] = world::Array(glass.glassNames,
+                                            glass.glassNameCount,
+                                            [](const G_GlassName& name)
+        {
+            return json{
+                {"nameStr",      name.nameStr ? name.nameStr : ""             },
+                {"name",         name.name                                    },
+                {"pieceIndices", world::Array(name.pieceIndices, name.pieceCount)},
+            };
+        });
+
+        world::WriteIfNonZero(jGlass, "pad", reinterpret_cast<const unsigned char(&)[108]>(glass.pad));
+
+        return jGlass;
+    }
+
+    class SpDumper
+    {
+    public:
+        SpDumper(std::ostream& stream, const Zone& zone)
+            : m_stream(stream),
+              m_zone(zone)
+        {
+        }
+
+        void Dump(const GameWorldSp& world) const
+        {
+            json jRoot;
+
+            jRoot["_type"] = "gameworld_sp";
+            jRoot["_version"] = 1;
+            jRoot["_game"] = GAME_LOWER_NAME;
+
+            jRoot["path"] = CreatePathData(world.path);
+            jRoot["vehicleTrack"] = CreateVehicleTrack(world.vehicleTrack);
+
+            if (world.g_glassData)
+                jRoot["g_glassData"] = CreateGlassData(*world.g_glassData);
+
+            m_stream << std::setw(4) << jRoot << "\n";
+        }
+
+    private:
+        [[nodiscard]] const std::string& ScriptStr(const ScriptString value) const
+        {
+            assert(value < m_zone.m_script_strings.Count());
+            return m_zone.m_script_strings[value];
+        }
+
+        [[nodiscard]] json CreatePathData(const PathData& path) const
+        {
+            json jPath;
+
+            jPath["nodes"] = world::Array(path.nodes,
+                                          path.nodeCount,
+                                          [this](const pathnode_t& node)
+                                          {
+                                              return CreateNode(node);
+                                          });
+
+            jPath["chainNodeCount"] = path.chainNodeCount;
+            jPath["chainNodeForNode"] = world::Array(path.chainNodeForNode, path.nodeCount);
+            jPath["nodeForChainNode"] = world::Array(path.nodeForChainNode, path.nodeCount);
+            jPath["visBytes"] = path.visBytes;
+            jPath["pathVis"] = world::Base64(path.pathVis, static_cast<size_t>(path.visBytes));
+
+            jPath["nodeTree"] = world::Array(path.nodeTree,
+                                             static_cast<size_t>(path.nodeTreeCount),
+                                             [this](const pathnode_tree_t& tree)
+                                             {
+                                                 return CreateNodeTree(tree);
+                                             });
+
+            return jPath;
+        }
+
+        [[nodiscard]] json CreateNodeTree(const pathnode_tree_t& tree) const
+        {
+            json jTree{
+                {"axis", tree.axis},
+                {"dist", tree.dist},
+            };
+
+            if (tree.axis >= 0)
+            {
+                auto jChildren = json::array();
+                for (const auto* child : tree.u.child)
+                    jChildren.emplace_back(child ? CreateNodeTree(*child) : json(nullptr));
+                jTree["children"] = std::move(jChildren);
+            }
+            else
+            {
+                jTree["nodes"] = world::Array(tree.u.s.nodes, static_cast<size_t>(tree.u.s.nodeCount));
+            }
+
+            return jTree;
+        }
+
+        [[nodiscard]] json CreateNode(const pathnode_t& node) const
+        {
+            const auto& c = node.constant;
+            const auto& d = node.dynamic;
+
+            auto jLinks = world::Array(c.Links,
+                                       c.totalLinkCount,
+                                       [](const pathlink_s& link)
+            {
+                return json{
+                    {"fDist",            link.fDist                             },
+                    {"nodeNum",          link.nodeNum                           },
+                    {"disconnectCount",  static_cast<int>(link.disconnectCount) },
+                    {"negotiationLink",  static_cast<int>(link.negotiationLink) },
+                    {"flags",            static_cast<int>(link.flags)           },
+                    {"ubBadPlaceCount",  json::array({static_cast<int>(link.ubBadPlaceCount[0]),
+                                                      static_cast<int>(link.ubBadPlaceCount[1]),
+                                                      static_cast<int>(link.ubBadPlaceCount[2])})},
+                };
+            });
+
+            return json{
+                {"constant",
+                 json{
+                     {"type", static_cast<int>(c.type)},
+                     {"spawnflags", c.spawnflags},
+                     {"targetname", ScriptStr(c.targetname)},
+                     {"script_linkName", ScriptStr(c.script_linkName)},
+                     {"script_noteworthy", ScriptStr(c.script_noteworthy)},
+                     {"target", ScriptStr(c.target)},
+                     {"animscript", ScriptStr(c.animscript)},
+                     {"animscriptfunc", c.animscriptfunc},
+                     {"vOrigin", world::Vec3(c.vOrigin)},
+                     {"fAngle", c.fAngle},
+                     {"forward", world::Vec2(c.forward)},
+                     {"fRadius", c.fRadius},
+                     {"minUseDistSq", c.minUseDistSq},
+                     {"wOverlapNode", json::array({c.wOverlapNode[0], c.wOverlapNode[1]})},
+                     {"links", std::move(jLinks)},
+                 }                                                     },
+                {"dynamic",
+                 json{
+                     {"iFreeTime", d.iFreeTime},
+                     {"iValidTime", json::array({d.iValidTime[0], d.iValidTime[1], d.iValidTime[2]})},
+                     {"dangerousNodeTime", json::array({d.dangerousNodeTime[0], d.dangerousNodeTime[1], d.dangerousNodeTime[2]})},
+                     {"inPlayerLOSTime", d.inPlayerLOSTime},
+                     {"wLinkCount", d.wLinkCount},
+                     {"wOverlapCount", d.wOverlapCount},
+                     {"turretEntNumber", d.turretEntNumber},
+                     {"userCount", static_cast<int>(d.userCount)},
+                     {"hasBadPlaceLink", d.hasBadPlaceLink},
+                 }                                                     },
+            };
+        }
+
+        [[nodiscard]] static json CreateVehicleTrack(const VehicleTrack& track)
+        {
+            auto jSegments = world::Array(track.segments,
+                                          track.segmentCount,
+                                          [&track](const VehicleTrackSegment& segment)
+            {
+                const auto jSectors = world::Array(segment.sectors,
+                                                   segment.sectorCount,
+                                                   [](const VehicleTrackSector& sector)
+                {
+                    const auto jObstacles = world::Array(sector.obstacles,
+                                                         sector.obstacleCount,
+                                                         [](const VehicleTrackObstacle& obstacle)
+                    {
+                        return json{
+                            {"origin", world::Vec2(obstacle.origin)},
+                            {"radius", obstacle.radius             },
+                        };
+                    });
+
+                    return json{
+                        {"startEdgeDir",         world::Vec2(sector.startEdgeDir)},
+                        {"startEdgeDist",        sector.startEdgeDist            },
+                        {"leftEdgeDir",          world::Vec2(sector.leftEdgeDir) },
+                        {"leftEdgeDist",         sector.leftEdgeDist             },
+                        {"rightEdgeDir",         world::Vec2(sector.rightEdgeDir)},
+                        {"rightEdgeDist",        sector.rightEdgeDist            },
+                        {"sectorLength",         sector.sectorLength             },
+                        {"sectorWidth",          sector.sectorWidth              },
+                        {"totalPriorLength",     sector.totalPriorLength         },
+                        {"totalFollowingLength", sector.totalFollowingLength     },
+                        {"obstacles",            jObstacles                      },
+                    };
+                });
+
+                const auto branchIndices = [&track](VehicleTrackSegment** branches, const unsigned count)
+                {
+                    return world::Array(branches,
+                                        count,
+                                        [&track](VehicleTrackSegment* const& branch)
+                                        {
+                                            return branch ? static_cast<int>(branch - track.segments) : -1;
+                                        });
+                };
+
+                return json{
+                    {"targetName",   segment.targetName ? segment.targetName : ""                  },
+                    {"sectors",      jSectors                                                      },
+                    {"nextBranches", branchIndices(segment.nextBranches, segment.nextBranchesCount) },
+                    {"prevBranches", branchIndices(segment.prevBranches, segment.prevBranchesCount) },
+                    {"endEdgeDir",   world::Vec2(segment.endEdgeDir)                                },
+                    {"endEdgeDist",  segment.endEdgeDist                                            },
+                    {"totalLength",  segment.totalLength                                            },
+                };
+            });
+
+            return json{
+                {"segments", std::move(jSegments)},
+            };
+        }
+
+        std::ostream& m_stream;
+        const Zone& m_zone;
+    };
+} // namespace
+
+namespace world
+{
+    void SP_CLASS_NAME::DumpAsset(AssetDumpingContext& context, const XAssetInfo<AssetGameWorldSp::Type>& asset)
+    {
+        const auto assetFile = context.OpenAssetFile(std::format("gameworld_sp/{}.json", asset.m_name));
+        if (!assetFile)
+            return;
+
+        SpDumper(*assetFile, context.m_zone).Dump(*asset.Asset());
+    }
+
+    void MP_CLASS_NAME::DumpAsset(AssetDumpingContext& context, const XAssetInfo<AssetGameWorldMp::Type>& asset)
+    {
+        const auto assetFile = context.OpenAssetFile(std::format("gameworld_mp/{}.json", asset.m_name));
+        if (!assetFile)
+            return;
+
+        const auto* world = asset.Asset();
+
+        json jRoot;
+        jRoot["_type"] = "gameworld_mp";
+        jRoot["_version"] = 1;
+        jRoot["_game"] = GAME_LOWER_NAME;
+
+        if (world->g_glassData)
+            jRoot["g_glassData"] = CreateGlassData(*world->g_glassData);
+
+        *assetFile << std::setw(4) << jRoot << "\n";
+    }
+} // namespace world
