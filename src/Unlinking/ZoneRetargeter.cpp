@@ -204,8 +204,19 @@ namespace
         auto target = std::make_unique<Zone>(source.m_name, source.m_priority, GameId::IW4MS, source.m_platform);
         target->m_language = source.m_language;
 
+        // The assets keep the raw scr_string_t values they were loaded with, so
+        // the target list has to come out index for index identical to the
+        // source one. A fresh Zone starts with the placeholder null entry its
+        // constructor seeds at index 0, and AddOrGetScriptString both collapses
+        // duplicates and cannot reuse that placeholder, either of which shifts
+        // every index and silently repoints every bone name and tag in the
+        // zone. Initializing the list the way a loaded zone does drops the
+        // placeholder, and appending verbatim keeps duplicates and the null
+        // position where they were.
+        //
+        target->m_script_strings.InitializeForExistingZone();
         for (auto i = 0u; i < source.m_script_strings.Count(); i++)
-            target->m_script_strings.AddOrGetScriptString(source.m_script_strings.CValue(i));
+            target->m_script_strings.AddScriptString(source.m_script_strings.CValue(i));
 
         auto waters = 0u;
         auto speakerMaps = 0u;
