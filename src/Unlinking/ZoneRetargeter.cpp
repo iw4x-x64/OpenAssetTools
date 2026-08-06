@@ -79,6 +79,78 @@ namespace
         return target;
     }
 
+    // x64 build splits x86's single interleaved complex_s H0 array into two
+    // planar float arrays, and which half holds the real part follows from the
+    // sim update.
+    //
+    // x64 sub_140038420 reads wTerm from +24, and the two planar arrays from +8
+    // and +16:
+    //
+    //     movss xmm0, [rbx+rax*4]       ; wave table at the quarter period shifted index
+    //     mulss xmm0, [r9]              ;   times the array at +8
+    //     movss [r14+rdx*4], xmm0       ;   into the FFT real input
+    //     movss xmm0, [rbx+rcx*4]       ; wave table at the unshifted index
+    //     mulss xmm0, [r10]             ;   times the array at +16
+    //     movss [r14+rdx*4+4000h], xmm0 ; into the FFT imaginary input
+    //
+    // x86 sub_427C80 is the same routine over the interleaved array, stepping
+    // it 8 bytes a turn:
+    //
+    //     flds  0x6ba7f00(,%ebp,4)  ; same table, same quarter period shifted index
+    //     fmuls (%edx)              ;   times H0[i].real
+    //     fstps (%ebx,%ecx,8)       ;   into the FFT real input
+    //     flds  0x6ba7f00(,%eax,4)  ; same table, unshifted
+    //     fmuls 0x4(%edx)           ;   times H0[i].imag
+    //     fstps 0x4(%ebx,%ecx,8)    ;   into the FFT imaginary input
+    //     add   $0x8,%edx           ; one complex_s per iteration
+    //
+    // Both index the table by `floatTime * wTerm[i] * (1024 / 2pi)` masked to
+    // 1024 entries, with the same 162.97466 constant. The array at +8 therefore
+    // takes the place of H0[i].real and the array at +16 takes the place of
+    // H0[i].imag, so H0Part0 is the real half and H0Part1 the imaginary one.
+    //
+    IW4MS::water_t* RetargetWater(const IW4::water_t& source, ZoneMemory& memory)
+    {
+        auto* target = memory.Alloc<IW4MS::water_t>();
+
+        target->writable.floatTime = source.writable.floatTime;
+        target->M = source.M;
+        target->N = source.N;
+        target->Lx = source.Lx;
+        target->Lz = source.Lz;
+        target->gravity = source.gravity;
+        target->windvel = source.windvel;
+        target->amplitude = source.amplitude;
+        std::memcpy(target->winddir, source.winddir, sizeof(target->winddir));
+        std::memcpy(target->codeConstant, source.codeConstant, sizeof(target->codeConstant));
+        target->image = reinterpret_cast<IW4MS::GfxImage*>(source.image);
+
+        // Load_water_t streams M * N floats for each of the three arrays, which
+        // is what the zone code counts them as. wTerm keeps both its element
+        // type and its length, so it carries over untouched and only H0 has to
+        // be deinterleaved.
+        //
+        const auto cellCount = source.M > 0 && source.N > 0 ? static_cast<size_t>(source.M) * static_cast<size_t>(source.N) : 0u;
+
+        target->wTerm = source.wTerm;
+        target->H0Part0 = nullptr;
+        target->H0Part1 = nullptr;
+
+        if (source.H0 && cellCount > 0u)
+        {
+            target->H0Part0 = memory.Alloc<float>(cellCount);
+            target->H0Part1 = memory.Alloc<float>(cellCount);
+
+            for (auto i = 0u; i < cellCount; i++)
+            {
+                target->H0Part0[i] = source.H0[i].real;
+                target->H0Part1[i] = source.H0[i].imag;
+            }
+        }
+
+        return target;
+    }
+
     constexpr auto IW4_GFX_AABB_TREE_SIZE = 44;
     constexpr auto IW4MS_GFX_AABB_TREE_SIZE = 56;
 
@@ -135,20 +207,40 @@ namespace
         for (auto i = 0u; i < source.m_script_strings.Count(); i++)
             target->m_script_strings.AddOrGetScriptString(source.m_script_strings.CValue(i));
 
-        auto waterMaterials = 0u;
+        auto waters = 0u;
         auto speakerMaps = 0u;
         auto rescaledOffsets = 0u;
         std::unordered_map<const IW4::SpeakerMap*, IW4MS::SpeakerMap*> retargetedSpeakerMaps;
+        std::unordered_map<const IW4::water_t*, IW4MS::water_t*> retargetedWaters;
 
         for (const auto* asset : source.m_pools)
         {
             if (asset->m_type == IW4::ASSET_TYPE_MATERIAL)
             {
-                const auto* material = static_cast<const IW4::Material*>(asset->m_ptr);
+                auto* material = static_cast<IW4::Material*>(asset->m_ptr);
+                if (!material->textureTable)
+                    continue;
+
                 for (auto i = 0u; i < material->textureCount; i++)
                 {
-                    if (material->textureTable && material->textureTable[i].semantic == IW4::TS_WATER_MAP && material->textureTable[i].u.water)
-                        waterMaterials++;
+                    auto& textureDef = material->textureTable[i];
+                    if (textureDef.semantic != IW4::TS_WATER_MAP || !textureDef.u.water)
+                        continue;
+
+                    // The water is reusable, so materials sharing one must keep
+                    // sharing it.
+                    //
+                    const auto existing = retargetedWaters.find(textureDef.u.water);
+                    if (existing != retargetedWaters.end())
+                    {
+                        textureDef.u.water = reinterpret_cast<IW4::water_t*>(existing->second);
+                        continue;
+                    }
+
+                    auto* retargeted = RetargetWater(*textureDef.u.water, target->Memory());
+                    retargetedWaters.emplace(textureDef.u.water, retargeted);
+                    textureDef.u.water = reinterpret_cast<IW4::water_t*>(retargeted);
+                    waters++;
                 }
             }
             else if (asset->m_type == IW4::ASSET_TYPE_SOUND)
@@ -180,14 +272,6 @@ namespace
             }
         }
 
-        if (waterMaterials > 0u)
-        {
-            con::error("Cannot retarget this zone: {} of its materials use a water texture, and water_t is laid out "
-                       "differently in the x64 build in a way that is not yet resolved. See F-014 and Q-008.",
-                       waterMaterials);
-            return nullptr;
-        }
-
         auto retargetedClipMaps = 0u;
         for (const auto* asset : source.m_pools)
         {
@@ -203,11 +287,13 @@ namespace
         }
 
         con::info("Retargeted {} assets from IW4 to IW4MS: {} clipmaps rebuilt for the wider struct, {} speaker maps "
-                  "reshaped into the x64 mix matrix, {} aabb tree child offsets restated in the x64 stride",
+                  "reshaped into the x64 mix matrix, {} aabb tree child offsets restated in the x64 stride, {} waters "
+                  "deinterleaved into planar spectrum halves",
                   source.m_pools.GetTotalAssetCount(),
                   retargetedClipMaps,
                   speakerMaps,
-                  rescaledOffsets);
+                  rescaledOffsets,
+                  waters);
 
         return target;
     }
